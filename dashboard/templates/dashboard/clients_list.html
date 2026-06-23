@@ -1,0 +1,37 @@
+{% extends "dashboard/base.html" %}
+{% block title %}العملاء — wassel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>العملاء</h1>
+</div>
+
+<div class="card">
+    {% if clients %}
+    <table>
+        <thead>
+            <tr>
+                <th>الاسم</th>
+                <th>الهاتف</th>
+                <th>العنوان الافتراضي</th>
+                <th>عدد الطلبات</th>
+                <th>تاريخ التسجيل</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in clients %}
+            <tr>
+                <td>{{ c.user.full_name|default:c.user.username }}</td>
+                <td>{{ c.user.phone }}</td>
+                <td>{{ c.default_address|default:"—" }}</td>
+                <td>{{ c.user.orders.count }}</td>
+                <td>{{ c.user.date_joined|date:"Y-m-d" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">لا يوجد عملاء مسجلون بعد.</div>
+    {% endif %}
+</div>
+{% endblock %}

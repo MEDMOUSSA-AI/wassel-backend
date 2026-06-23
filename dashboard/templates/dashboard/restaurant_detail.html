@@ -1,0 +1,86 @@
+{% extends "dashboard/base.html" %}
+{% block title %}{{ restaurant.name }} — wassel{% endblock %}
+
+{% block content %}
+<a href="{% url 'dashboard:restaurants' %}" class="back-link">→ الرجوع لقائمة المطاعم</a>
+
+<div class="page-header">
+    <h1>{{ restaurant.name }}</h1>
+    <span class="status-pill status-{{ restaurant.approval_status }}">{{ restaurant.get_approval_status_display }}</span>
+</div>
+
+<div class="card">
+    <h2>بيانات المطعم</h2>
+    <div class="detail-grid">
+        <div class="k">اسم المالك</div><div class="v">{{ restaurant.owner_name }}</div>
+        <div class="k">رقم الهاتف</div><div class="v">{{ restaurant.owner.phone }}</div>
+        <div class="k">الفئة</div><div class="v">{{ restaurant.category.name|default:"—" }}</div>
+        <div class="k">المدينة</div><div class="v">{{ restaurant.city }}</div>
+        <div class="k">العنوان</div><div class="v">{{ restaurant.address }}</div>
+        <div class="k">الحساب البنكي</div><div class="v">{{ restaurant.bank_account|default:"—" }}</div>
+        <div class="k">التقييم</div><div class="v">{{ restaurant.rating }}</div>
+        <div class="k">مفتوح الآن</div><div class="v">{% if restaurant.is_open %}نعم{% else %}لا{% endif %}</div>
+        <div class="k">تاريخ التسجيل</div><div class="v">{{ restaurant.created_at|date:"Y-m-d H:i" }}</div>
+    </div>
+
+    {% if restaurant.approval_status == "pending" %}
+    <div class="actions-row">
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="approve" class="btn btn-success">✓ الموافقة على المطعم</button>
+        </form>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="reject" class="btn btn-danger">✗ رفض المطعم</button>
+        </form>
+    </div>
+    {% elif restaurant.approval_status == "approved" %}
+    <div class="actions-row">
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="reject" class="btn btn-danger">✗ رفض المطعم</button>
+        </form>
+    </div>
+    {% else %}
+    <div class="actions-row">
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="approve" class="btn btn-success">✓ الموافقة على المطعم</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h2 style="margin:0;">القوائم والمنتجات</h2>
+        <a href="{% url 'dashboard:product_create' restaurant_pk=restaurant.pk %}" class="btn btn-primary btn-sm">+ إضافة منتج</a>
+    </div>
+    {% if menus %}
+        {% for menu in menus %}
+        <h3 style="font-size:15px;margin:14px 0 8px;">{{ menu.name }} {% if not menu.is_active %}(غير نشطة){% endif %}</h3>
+        {% if menu.products.all %}
+        <table>
+            <thead>
+                <tr><th>الاسم</th><th>السعر</th><th>نوع العرض</th><th>متوفر</th></tr>
+            </thead>
+            <tbody>
+                {% for p in menu.products.all %}
+                <tr>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.final_price }} أ.م {% if p.display_type == "discount" %}<small>(خصم {{ p.discount_percent }}%)</small>{% endif %}</td>
+                    <td>{{ p.get_display_type_display }}</td>
+                    <td>{% if p.is_available %}نعم{% else %}لا{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">لا توجد منتجات في هذه القائمة.</div>
+        {% endif %}
+        {% endfor %}
+    {% else %}
+    <div class="empty-state">لا توجد قوائم لهذا المطعم بعد.</div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "dashboard/base.html" %}
+{% block title %}طلب #{{ order.id }} — wassel{% endblock %}
+
+{% block content %}
+<a href="{% url 'dashboard:orders' %}" class="back-link">→ الرجوع لقائمة الطلبات</a>
+
+<div class="page-header">
+    <h1>طلب #{{ order.id }} — {{ order.get_order_type_display }}</h1>
+    <span class="status-pill status-{{ order.status }}">{{ order.get_status_display }}</span>
+</div>
+
+<div class="card">
+    <h2>بيانات الطلب</h2>
+    <div class="detail-grid">
+        <div class="k">العميل</div><div class="v">{{ order.client.full_name|default:order.client.phone }} ({{ order.client.phone }})</div>
+        <div class="k">المطعم</div><div class="v">{{ order.restaurant.name|default:"—" }}</div>
+        <div class="k">المندوب</div><div class="v">{{ order.livreur.full_name|default:"لم يُعيّن بعد" }}</div>
+        <div class="k">نقطة الانطلاق</div><div class="v">{{ order.pickup_address }}</div>
+        <div class="k">نقطة الوصول</div><div class="v">{{ order.dropoff_address }}</div>
+        {% if order.order_type == "parcel" %}
+        <div class="k">اسم المستلم</div><div class="v">{{ order.recipient_name|default:"—" }}</div>
+        <div class="k">هاتف المستلم</div><div class="v">{{ order.recipient_phone|default:"—" }}</div>
+        <div class="k">ملاحظات الطرد</div><div class="v">{{ order.parcel_notes|default:"—" }}</div>
+        {% endif %}
+        <div class="k">سعر الأصناف</div><div class="v">{{ order.items_price }} أ.م</div>
+        <div class="k">رسوم التوصيل</div><div class="v">{{ order.delivery_fee }} أ.م</div>
+        <div class="k">المجموع الكلي</div><div class="v">{{ order.total_price }} أ.م</div>
+        <div class="k">طريقة الدفع</div><div class="v">{% if order.payment_method == "cash" %}عند الاستلام{% else %}{{ order.payment_method }}{% endif %}</div>
+        <div class="k">المسافة</div><div class="v">{{ order.distance_km|default:"—" }} كم</div>
+        <div class="k">تاريخ الإنشاء</div><div class="v">{{ order.created_at|date:"Y-m-d H:i" }}</div>
+    </div>
+</div>
+
+{% if order.order_type == "food" and items %}
+<div class="card">
+    <h2>الأصناف المطلوبة</h2>
+    <table>
+        <thead><tr><th>الصنف</th><th>السعر</th><th>الكمية</th><th>المجموع</th></tr></thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.product_name }}</td>
+                <td>{{ item.unit_price }} أ.م</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.subtotal }} أ.م</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div class="card">
+    <h2>سجل تغيّر الحالة</h2>
+    {% if history %}
+    <table>
+        <thead><tr><th>الحالة</th><th>الوقت</th></tr></thead>
+        <tbody>
+            {% for h in history %}
+            <tr>
+                <td><span class="status-pill status-{{ h.status }}">{{ h.get_status_display }}</span></td>
+                <td>{{ h.timestamp|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">لا يوجد سجل تتبع لهذا الطلب بعد.</div>
+    {% endif %}
+</div>
+{% endblock %}

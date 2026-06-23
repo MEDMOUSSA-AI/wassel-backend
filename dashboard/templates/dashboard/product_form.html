@@ -1,0 +1,95 @@
+{% extends "dashboard/base.html" %}
+{% block title %}إضافة منتج — {{ restaurant.name }} — wassel{% endblock %}
+
+{% block content %}
+<a href="{% url 'dashboard:restaurant_detail' pk=restaurant.pk %}" class="back-link">→ الرجوع إلى {{ restaurant.name }}</a>
+
+<div class="page-header">
+    <h1>إضافة منتج إلى «{{ restaurant.name }}»</h1>
+</div>
+
+<div class="card">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="field">
+            <label for="menu">القائمة *</label>
+            {% if menus %}
+            <select id="menu" name="menu" onchange="toggleNewMenuField()">
+                {% for m in menus %}
+                <option value="{{ m.id }}">{{ m.name }}{% if not m.is_active %} (غير نشطة){% endif %}</option>
+                {% endfor %}
+                <option value="new">+ إنشاء قائمة جديدة</option>
+            </select>
+            {% else %}
+            <input type="hidden" id="menu" name="menu" value="new">
+            <div class="empty-state" style="padding:10px 0;">لا توجد قوائم لهذا المطعم بعد — سيتم إنشاء قائمة جديدة تلقائياً.</div>
+            {% endif %}
+        </div>
+
+        <div class="field" id="new-menu-field"{% if menus %} style="display:none;"{% endif %}>
+            <label for="new_menu_name">اسم القائمة الجديدة</label>
+            <input type="text" id="new_menu_name" name="new_menu_name" placeholder="القائمة الرئيسية">
+        </div>
+
+        <div class="field">
+            <label for="name">اسم المنتج *</label>
+            <input type="text" id="name" name="name" required>
+        </div>
+
+        <div class="field">
+            <label for="description">الوصف</label>
+            <textarea id="description" name="description" rows="3"></textarea>
+        </div>
+
+        <div class="field">
+            <label for="price">السعر (أ.م) *</label>
+            <input type="number" step="0.01" min="0.01" id="price" name="price" required>
+        </div>
+
+        <div class="field">
+            <label for="image">الصورة</label>
+            <input type="file" id="image" name="image" accept="image/*">
+        </div>
+
+        <div class="field">
+            <label for="display_type">نوع العرض</label>
+            <select id="display_type" name="display_type" onchange="toggleDiscountField()">
+                {% for value, label in display_type_choices %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="field" id="discount-field" style="display:none;">
+            <label for="discount_percent">نسبة الخصم (%)</label>
+            <input type="number" min="1" max="100" id="discount_percent" name="discount_percent" value="0">
+        </div>
+
+        <div class="field">
+            <label>
+                <input type="checkbox" name="is_available" checked style="width:auto; display:inline-block;">
+                متوفر حالياً
+            </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary">إضافة المنتج</button>
+    </form>
+</div>
+
+<script>
+    function toggleNewMenuField() {
+        var menuSelect = document.getElementById('menu');
+        var newMenuField = document.getElementById('new-menu-field');
+        if (!menuSelect || !newMenuField) return;
+        newMenuField.style.display = (menuSelect.value === 'new') ? '' : 'none';
+    }
+    function toggleDiscountField() {
+        var displayType = document.getElementById('display_type');
+        var discountField = document.getElementById('discount-field');
+        if (!displayType || !discountField) return;
+        discountField.style.display = (displayType.value === 'discount') ? '' : 'none';
+    }
+    toggleDiscountField();
+</script>
+{% endblock %}

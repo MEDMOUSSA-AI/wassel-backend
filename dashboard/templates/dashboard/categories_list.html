@@ -1,0 +1,45 @@
+{% extends "dashboard/base.html" %}
+{% block title %}الفئات — wassel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>فئات المطاعم</h1>
+</div>
+
+<div class="card">
+    <h2>إضافة فئة جديدة</h2>
+    <form method="post" style="display:flex; gap:10px; align-items:flex-end;">
+        {% csrf_token %}
+        <div class="field" style="flex:1; margin-bottom:0;">
+            <label for="name">اسم الفئة</label>
+            <input type="text" id="name" name="name" placeholder="مثال: مخبزة، عصائر..." required>
+        </div>
+        <button type="submit" class="btn btn-primary">إضافة</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>الفئات الحالية</h2>
+    {% if categories %}
+    <table>
+        <thead><tr><th>الاسم</th><th>عدد المطاعم</th><th></th></tr></thead>
+        <tbody>
+            {% for cat in categories %}
+            <tr>
+                <td>{{ cat.name }}</td>
+                <td>{{ cat.restaurants.count }}</td>
+                <td>
+                    <form method="post" action="{% url 'dashboard:category_delete' cat.pk %}" onsubmit="return confirm('هل تريد حذف هذه الفئة؟');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm">حذف</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">لا توجد فئات بعد.</div>
+    {% endif %}
+</div>
+{% endblock %}

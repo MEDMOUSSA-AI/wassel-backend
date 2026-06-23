@@ -1,0 +1,46 @@
+{% extends "dashboard/base.html" %}
+{% block title %}المطاعم — wassel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>المطاعم</h1>
+</div>
+
+<div class="filters">
+    <a href="?status=all" class="{% if current_status == 'all' %}active{% endif %}">الكل</a>
+    <a href="?status=pending" class="{% if current_status == 'pending' %}active{% endif %}">قيد المراجعة</a>
+    <a href="?status=approved" class="{% if current_status == 'approved' %}active{% endif %}">موافق عليها</a>
+    <a href="?status=rejected" class="{% if current_status == 'rejected' %}active{% endif %}">مرفوضة</a>
+</div>
+
+<div class="card">
+    {% if restaurants %}
+    <table>
+        <thead>
+            <tr>
+                <th>اسم المطعم</th>
+                <th>المالك</th>
+                <th>الفئة</th>
+                <th>المدينة</th>
+                <th>الحالة</th>
+                <th>تاريخ التسجيل</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in restaurants %}
+            <tr onclick="window.location='{% url 'dashboard:restaurant_detail' r.pk %}'" style="cursor:pointer">
+                <td>{{ r.name }}</td>
+                <td>{{ r.owner_name }}</td>
+                <td>{{ r.category.name|default:"—" }}</td>
+                <td>{{ r.city }}</td>
+                <td><span class="status-pill status-{{ r.approval_status }}">{{ r.get_approval_status_display }}</span></td>
+                <td>{{ r.created_at|date:"Y-m-d" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">لا توجد مطاعم في هذه الفئة.</div>
+    {% endif %}
+</div>
+{% endblock %}

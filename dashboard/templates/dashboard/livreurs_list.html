@@ -1,0 +1,46 @@
+{% extends "dashboard/base.html" %}
+{% block title %}المناديب — wassel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>المناديب</h1>
+</div>
+
+<div class="filters">
+    <a href="?status=all" class="{% if current_status == 'all' %}active{% endif %}">الكل</a>
+    <a href="?status=pending" class="{% if current_status == 'pending' %}active{% endif %}">قيد المراجعة</a>
+    <a href="?status=approved" class="{% if current_status == 'approved' %}active{% endif %}">موافق عليهم</a>
+    <a href="?status=rejected" class="{% if current_status == 'rejected' %}active{% endif %}">مرفوضون</a>
+</div>
+
+<div class="card">
+    {% if livreurs %}
+    <table>
+        <thead>
+            <tr>
+                <th>الاسم</th>
+                <th>الهاتف</th>
+                <th>المركبة</th>
+                <th>الرصيد</th>
+                <th>متاح الآن</th>
+                <th>الحالة</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for l in livreurs %}
+            <tr onclick="window.location='{% url 'dashboard:livreur_detail' l.pk %}'" style="cursor:pointer">
+                <td>{{ l.user.full_name|default:l.user.username }}</td>
+                <td>{{ l.user.phone }}</td>
+                <td>{{ l.vehicle_model|default:"—" }} {{ l.vehicle_plate }}</td>
+                <td>{{ l.balance }} أ.م</td>
+                <td>{% if l.is_online %}متصل{% else %}غير متصل{% endif %}</td>
+                <td><span class="status-pill status-{{ l.approval_status }}">{{ l.get_approval_status_display }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">لا يوجد مناديب في هذه الفئة.</div>
+    {% endif %}
+</div>
+{% endblock %}

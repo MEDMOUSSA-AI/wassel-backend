@@ -1,0 +1,77 @@
+{% extends "dashboard/base.html" %}
+{% block title %}الرئيسية — wassel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>نظرة عامة</h1>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="value">{{ total_restaurants }}</div>
+        <div class="label">إجمالي المطاعم</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ total_livreurs }}</div>
+        <div class="label">إجمالي المناديب</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ total_clients }}</div>
+        <div class="label">إجمالي العملاء</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ total_orders }}</div>
+        <div class="label">إجمالي الطلبات</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ orders_today }}</div>
+        <div class="label">طلبات اليوم</div>
+    </div>
+    <div class="stat-card">
+        <div class="value">{{ orders_last_7_days }}</div>
+        <div class="label">طلبات آخر 7 أيام</div>
+    </div>
+    <div class="stat-card alert-card">
+        <div class="value">{{ pending_restaurants }}</div>
+        <div class="label">مطاعم بانتظار الموافقة</div>
+    </div>
+    <div class="stat-card alert-card">
+        <div class="value">{{ pending_livreurs }}</div>
+        <div class="label">مناديب بانتظار الموافقة</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>أحدث الطلبات</h2>
+    {% if recent_orders %}
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>النوع</th>
+                <th>العميل</th>
+                <th>المطعم</th>
+                <th>الحالة</th>
+                <th>المبلغ</th>
+                <th>التاريخ</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in recent_orders %}
+            <tr onclick="window.location='{% url 'dashboard:order_detail' order.pk %}'" style="cursor:pointer">
+                <td>{{ order.id }}</td>
+                <td>{{ order.get_order_type_display }}</td>
+                <td>{{ order.client.full_name|default:order.client.phone }}</td>
+                <td>{{ order.restaurant.name|default:"—" }}</td>
+                <td><span class="status-pill status-{{ order.status }}">{{ order.get_status_display }}</span></td>
+                <td>{{ order.total_price }} أ.م</td>
+                <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">لا توجد طلبات بعد.</div>
+    {% endif %}
+</div>
+{% endblock %}

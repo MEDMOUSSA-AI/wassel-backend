@@ -1,0 +1,56 @@
+{% extends "dashboard/base.html" %}
+{% block title %}الطلبات — wassel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>الطلبات</h1>
+</div>
+
+<div class="filters">
+    <a href="?type=all&status={{ current_status }}" class="{% if current_type == 'all' %}active{% endif %}">كل الأنواع</a>
+    <a href="?type=food&status={{ current_status }}" class="{% if current_type == 'food' %}active{% endif %}">طلبيات مطاعم</a>
+    <a href="?type=parcel&status={{ current_status }}" class="{% if current_type == 'parcel' %}active{% endif %}">توصيلات طرود</a>
+</div>
+
+<div class="filters">
+    <a href="?status=all&type={{ current_type }}" class="{% if current_status == 'all' %}active{% endif %}">كل الحالات</a>
+    {% for value, label in status_choices %}
+    <a href="?status={{ value }}&type={{ current_type }}" class="{% if current_status == value %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+</div>
+
+<div class="card">
+    {% if orders %}
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>النوع</th>
+                <th>العميل</th>
+                <th>المطعم</th>
+                <th>المندوب</th>
+                <th>الحالة</th>
+                <th>المبلغ</th>
+                <th>التاريخ</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for o in orders %}
+            <tr onclick="window.location='{% url 'dashboard:order_detail' o.pk %}'" style="cursor:pointer">
+                <td>{{ o.id }}</td>
+                <td>{{ o.get_order_type_display }}</td>
+                <td>{{ o.client.full_name|default:o.client.phone }}</td>
+                <td>{{ o.restaurant.name|default:"—" }}</td>
+                <td>{{ o.livreur.full_name|default:"—" }}</td>
+                <td><span class="status-pill status-{{ o.status }}">{{ o.get_status_display }}</span></td>
+                <td>{{ o.total_price }} أ.م</td>
+                <td>{{ o.created_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">لا توجد طلبات مطابقة.</div>
+    {% endif %}
+</div>
+{% endblock %}
