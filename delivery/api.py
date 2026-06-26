@@ -5,6 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from accounts.models import User, LivreurProfile
 from orders.models import Order, OrderStatusHistory
@@ -189,19 +190,38 @@ def my_deliveries(request):
     if request.user.role != User.Role.LIVREUR:
         return Response({"detail": "غير مصرح."}, status=403)
 
-    orders = Order.objects.filter(livreur=request.user).order_by("-created_at")
-    data = [
-        {
-            "id":              o.id,
-            "order_type":      o.order_type,
-            "status":          o.status,
-            "dropoff_address": o.dropoff_address,
-            "delivery_fee":    float(o.delivery_fee),
-            "net_fee":         float(o.livreur_net_fee),
-            "created_at":      o.created_at.isoformat(),
-        }
-        for o in orders
-    ]
+    orders = (
+        Order.objects
+        .filter(livreur=request.user)
+        .select_related("restaurant")
+        .prefetch_related("status_history")
+        .order_by("-created_at")
+    )
+
+    data = []
+    for o in orders:
+        # آخر سجل بحالة "delivered" لمعرفة وقت التسليم الفعلي
+        delivered_record = next(
+            (h for h in sorted(o.status_history.all(), key=lambda h: h.timestamp, reverse=True)
+             if h.status == Order.Status.DELIVERED),
+            None,
+        )
+        data.append({
+            "id":                o.id,
+            "order_type":        o.order_type,
+            "status":            o.status,
+            "restaurant":        {"id": o.restaurant.id, "name": o.restaurant.name} if o.restaurant else None,
+            "pickup_address":    o.pickup_address,
+            "dropoff_address":   o.dropoff_address,
+            "items_total":       float(o.items_price),
+            "delivery_fee":      float(o.delivery_fee),
+            "net_fee":           float(o.livreur_net_fee),
+            "distance_km":       o.distance_km,
+            "estimated_minutes": o.estimated_minutes,
+            "created_at":        o.created_at.isoformat(),
+            "delivered_at":      delivered_record.timestamp.isoformat() if delivered_record else None,
+        })
+
     return Response(data)
 
 
@@ -216,7 +236,18 @@ def my_balance(request):
         return Response({"detail": "غير مصرح."}, status=403)
 
     profile = get_object_or_404(LivreurProfile, user=request.user)
+
+    today = timezone.localdate()
+    today_count = Order.objects.filter(
+        livreur=request.user,
+        status=Order.Status.DELIVERED,
+        status_history__status=Order.Status.DELIVERED,
+        status_history__timestamp__date=today,
+    ).distinct().count()
+
     return Response({
         "balance":         float(profile.balance),
         "commission_rate": float(profile.commission_rate),
+        "is_online":       profile.is_online,
+        "today_count":     today_count,
     })
