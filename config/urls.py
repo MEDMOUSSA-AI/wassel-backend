@@ -14,6 +14,8 @@ urlpatterns = [
     path('api/restaurants/',   include('restaurants.urls')),
     path('api/orders/',        include('orders.urls')),
     path('api/delivery/',      include('delivery.urls')),
+    path('api/promotions/',    include('restaurants.promo_urls')),   # ✅ العروض
+    path('api/favorites/',     include('favorites.urls')),           # ✅ المفضلة
 ]
 
 if settings.DEBUG:
