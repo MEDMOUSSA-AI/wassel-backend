@@ -352,3 +352,37 @@ def delete_product(request, pk):
     product = get_object_or_404(Product, pk=pk, menu__restaurant__owner=request.user)
     product.delete()
     return Response(status=204)
+
+
+# ─────────────────────────────────────────────
+# تفاصيل منتج/عرض ترويجي
+# GET /api/restaurants/promotions/<pk>/
+# ─────────────────────────────────────────────
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def promotion_detail(request, pk):
+    p = get_object_or_404(
+        Product,
+        pk=pk,
+        is_available=True,
+        menu__restaurant__approval_status="approved",
+    )
+    r          = p.menu.restaurant
+    orig_price = float(p.price)
+    disc       = p.discount_percent or 0
+    return Response({
+        "id":               p.id,
+        "name":             p.name,
+        "description":      p.description or "",
+        "image":            request.build_absolute_uri(p.image.url) if p.image else "",
+        "price":            orig_price,
+        "discounted_price": round(orig_price * (1 - disc / 100), 2),
+        "discount_percent": disc,
+        "display_type":     p.display_type,
+        "menu_name":        p.menu.name,
+        "restaurant": {
+            "id":   r.id,
+            "name": r.name,
+            "logo": request.build_absolute_uri(r.logo.url) if r.logo else "",
+        },
+    })
