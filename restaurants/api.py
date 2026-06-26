@@ -1,14 +1,79 @@
 """
 restaurants/api.py — API المطاعم والقوائم والمنتجات
+المسار: restaurants/api.py
 """
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from django.db.models import Count
 
 from accounts.models import User
+from orders.models import Order
 from .models import Restaurant, RestaurantCategory, Menu, Product, WorkingHours
+
+
+# ─────────────────────────────────────────────
+# دالة مساعدة: بناء بيانات المطعم الكاملة للقوائم
+# تُرجع الحقول التي يتوقعها Flutter في home_screen و category_list_screen
+# ─────────────────────────────────────────────
+def _restaurant_list_data(r, request):
+    """
+    الحقول المُرجَعة:
+      id, name, restaurant_name,
+      logo, cover_image,
+      is_open,
+      rating (legacy) + avg_rating (يستخدمه category_list_screen),
+      total_orders, likes, total_likes,
+      delivery_fee, estimated_minutes,
+      lat, lng, address, city,
+      category: {id, name, image}
+    """
+    # عدد الطلبات المكتملة للمطعم
+    total_orders = Order.objects.filter(
+        restaurant=r, status="delivered"
+    ).count()
+
+    # category ككائن كامل (يحتاجه home_screen لعرض اسم التصنيف)
+    cat = None
+    if r.category:
+        cat = {
+            "id":    r.category.id,
+            "name":  r.category.name,
+            "image": request.build_absolute_uri(r.category.image.url)
+                     if r.category.image else None,
+        }
+
+    rating_val = float(r.rating)
+
+    return {
+        "id":                r.id,
+        "name":              r.name,
+        "restaurant_name":   r.name,          # alias يستخدمه category_list_screen
+        "owner_name":        r.owner_name,
+        "address":           r.address,
+        "city":              r.city,
+        "lat":               r.lat,
+        "lng":               r.lng,
+        # تقييم — مزدوج لتوافق الشاشات المختلفة
+        "rating":            rating_val,
+        "avg_rating":        rating_val,
+        "is_open":           r.is_open,
+        "logo":              request.build_absolute_uri(r.logo.url) if r.logo else None,
+        "cover_image":       request.build_absolute_uri(r.cover_image.url)
+                             if r.cover_image else None,
+        # إحصاءات
+        "total_orders":      total_orders,
+        "likes":             0,               # لا يوجد نموذج إعجاب بعد → 0
+        "total_likes":       0,
+        # رسوم التوصيل والوقت (قيم افتراضية حتى يُضاف النموذج لاحقاً)
+        "delivery_fee":      50,              # MRU — غيّر حسب منطق عملك
+        "estimated_minutes": 30,
+        # تصنيف كامل
+        "category":          cat,
+        "category_id":       r.category_id,
+    }
 
 
 # ─────────────────────────────────────────────
@@ -33,31 +98,17 @@ def categories_list(request):
 # ─────────────────────────────────────────────
 # قائمة المطاعم المتاحة للعملاء
 # GET /api/restaurants/
+# GET /api/restaurants/?category_id=<id>
 # ─────────────────────────────────────────────
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def restaurants_list(request):
-    qs = Restaurant.objects.filter(approval_status="approved")
+    qs = Restaurant.objects.filter(approval_status="approved").select_related("category")
     category_id = request.query_params.get("category_id")
     if category_id:
         qs = qs.filter(category_id=category_id)
 
-    data = [
-        {
-            "id":          r.id,
-            "name":        r.name,
-            "category":    r.category.name if r.category else None,
-            "address":     r.address,
-            "city":        r.city,
-            "lat":         r.lat,
-            "lng":         r.lng,
-            "rating":      float(r.rating),
-            "is_open":     r.is_open,
-            "logo":        request.build_absolute_uri(r.logo.url) if r.logo else None,
-            "cover_image": request.build_absolute_uri(r.cover_image.url) if r.cover_image else None,
-        }
-        for r in qs
-    ]
+    data = [_restaurant_list_data(r, request) for r in qs]
     return Response(data)
 
 
@@ -68,7 +119,10 @@ def restaurants_list(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def restaurant_detail(request, pk):
-    r = get_object_or_404(Restaurant, pk=pk, approval_status="approved")
+    r = get_object_or_404(
+        Restaurant.objects.select_related("category"),
+        pk=pk, approval_status="approved"
+    )
 
     menus = []
     for menu in r.menus.filter(is_active=True):
@@ -103,19 +157,42 @@ def restaurant_detail(request, pk):
         for wh in r.working_hours.all()
     ]
 
+    total_orders = Order.objects.filter(restaurant=r, status="delivered").count()
+    rating_val   = float(r.rating)
+
+    cat = None
+    if r.category:
+        cat = {
+            "id":    r.category.id,
+            "name":  r.category.name,
+            "image": request.build_absolute_uri(r.category.image.url)
+                     if r.category.image else None,
+        }
+
     return Response({
-        "id":            r.id,
-        "name":          r.name,
-        "address":       r.address,
-        "city":          r.city,
-        "lat":           r.lat,
-        "lng":           r.lng,
-        "rating":        float(r.rating),
-        "is_open":       r.is_open,
-        "logo":          request.build_absolute_uri(r.logo.url) if r.logo else None,
-        "cover_image":   request.build_absolute_uri(r.cover_image.url) if r.cover_image else None,
-        "menus":         menus,
-        "working_hours": working_hours,
+        "id":                r.id,
+        "name":              r.name,
+        "restaurant_name":   r.name,
+        "owner_name":        r.owner_name,
+        "address":           r.address,
+        "city":              r.city,
+        "lat":               r.lat,
+        "lng":               r.lng,
+        "rating":            rating_val,
+        "avg_rating":        rating_val,
+        "is_open":           r.is_open,
+        "logo":              request.build_absolute_uri(r.logo.url) if r.logo else None,
+        "cover_image":       request.build_absolute_uri(r.cover_image.url)
+                             if r.cover_image else None,
+        "total_orders":      total_orders,
+        "likes":             0,
+        "total_likes":       0,
+        "delivery_fee":      50,
+        "estimated_minutes": 30,
+        "category":          cat,
+        "category_id":       r.category_id,
+        "menus":             menus,
+        "working_hours":     working_hours,
     })
 
 
@@ -130,19 +207,30 @@ def my_restaurant(request):
         return Response({"detail": "غير مصرح."}, status=403)
 
     r = get_object_or_404(Restaurant, owner=request.user)
+    total_orders = Order.objects.filter(restaurant=r, status="delivered").count()
+    rating_val   = float(r.rating)
+
     return Response({
         "id":              r.id,
         "name":            r.name,
+        "restaurant_name": r.name,
         "owner_name":      r.owner_name,
         "address":         r.address,
         "city":            r.city,
         "lat":             r.lat,
         "lng":             r.lng,
-        "rating":          float(r.rating),
+        "rating":          rating_val,
+        "avg_rating":      rating_val,
         "is_open":         r.is_open,
         "approval_status": r.approval_status,
         "logo":            request.build_absolute_uri(r.logo.url) if r.logo else None,
-        "cover_image":     request.build_absolute_uri(r.cover_image.url) if r.cover_image else None,
+        "cover_image":     request.build_absolute_uri(r.cover_image.url)
+                           if r.cover_image else None,
+        "total_orders":    total_orders,
+        "likes":           0,
+        "total_likes":     0,
+        "delivery_fee":    50,
+        "estimated_minutes": 30,
     })
 
 
@@ -199,7 +287,7 @@ def create_product(request):
     menu_id = request.data.get("menu_id")
     menu = get_object_or_404(Menu, pk=menu_id, restaurant__owner=request.user)
 
-    name = request.data.get("name", "").strip()
+    name  = request.data.get("name", "").strip()
     price = request.data.get("price")
     if not name or not price:
         return Response({"detail": "الاسم والسعر مطلوبان."}, status=400)
@@ -218,6 +306,7 @@ def create_product(request):
         "name":        product.name,
         "price":       float(product.price),
         "final_price": float(product.final_price),
+        "image":       request.build_absolute_uri(product.image.url) if product.image else None,
     }, status=201)
 
 
@@ -242,12 +331,17 @@ def update_product(request, pk):
         product.image = request.FILES["image"]
 
     product.save()
-    return Response({"id": product.id, "name": product.name, "final_price": float(product.final_price)})
+    return Response({
+        "id":          product.id,
+        "name":        product.name,
+        "final_price": float(product.final_price),
+        "image":       request.build_absolute_uri(product.image.url) if product.image else None,
+    })
 
 
 # ─────────────────────────────────────────────
 # حذف منتج
-# DELETE /api/restaurants/products/<id>/
+# DELETE /api/restaurants/products/<id>/delete/
 # ─────────────────────────────────────────────
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
