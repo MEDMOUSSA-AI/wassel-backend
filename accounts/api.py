@@ -13,7 +13,7 @@ from .models import User, ClientProfile, LivreurProfile
 
 # ─────────────────────────────────────────────
 # تسجيل الدخول (جميع الأدوار)
-# POST /api/auth/login/   {phone, password}
+# POST /api/auth/login/
 # ─────────────────────────────────────────────
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -40,7 +40,6 @@ def login_view(request):
         },
     }
 
-    # بيانات إضافية حسب الدور
     if user.role == User.Role.RESTAURANT and hasattr(user, "restaurant"):
         r = user.restaurant
         payload["restaurant"] = {
@@ -49,7 +48,6 @@ def login_view(request):
             "approval_status": r.approval_status,
             "is_open":         r.is_open,
         }
-
     elif user.role == User.Role.LIVREUR and hasattr(user, "livreur_profile"):
         lp = user.livreur_profile
         payload["livreur"] = {
@@ -81,7 +79,6 @@ def register_client(request):
         return Response({"detail": "رقم الهاتف مسجّل مسبقاً."}, status=409)
 
     user = User(role=User.Role.CLIENT, phone=phone, full_name=full_name)
-    # العميل بدون كلمة مرور — نضع token فقط
     user.set_unusable_password()
     user.save()
 
@@ -145,9 +142,9 @@ def register_restaurant(request):
 
     token, _ = Token.objects.get_or_create(user=user)
     return Response({
-        "token": token.key,
-        "role":  user.role,
-        "user":  {"id": user.id, "full_name": user.full_name, "phone": user.phone},
+        "token":           token.key,
+        "role":            user.role,
+        "user":            {"id": user.id, "full_name": user.full_name, "phone": user.phone},
         "approval_status": "pending",
     }, status=201)
 
@@ -186,9 +183,9 @@ def register_livreur(request):
 
     token, _ = Token.objects.get_or_create(user=user)
     return Response({
-        "token": token.key,
-        "role":  user.role,
-        "user":  {"id": user.id, "full_name": user.full_name, "phone": user.phone},
+        "token":           token.key,
+        "role":            user.role,
+        "user":            {"id": user.id, "full_name": user.full_name, "phone": user.phone},
         "approval_status": "pending",
     }, status=201)
 
@@ -205,17 +202,81 @@ def logout_view(request):
 
 
 # ─────────────────────────────────────────────
-# بيانات الحساب الحالي
-# GET /api/auth/me/
+# بيانات الحساب الحالي + تعديله
+# GET  /api/auth/me/  → جلب البيانات
+# PATCH /api/auth/me/ → تعديل الاسم والعنوان والصورة
 # ─────────────────────────────────────────────
-@api_view(["GET"])
+@api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def me_view(request):
     user = request.user
-    data = {
+
+    # ── GET ──────────────────────────────────
+    if request.method == "GET":
+        data = {
+            "id":        user.id,
+            "full_name": user.full_name,
+            "phone":     user.phone,
+            "role":      user.role,
+            "address":   getattr(user, "address", "") or "",
+        }
+        # بيانات إضافية حسب الدور
+        if user.role == User.Role.LIVREUR and hasattr(user, "livreur_profile"):
+            lp = user.livreur_profile
+            data["is_online"]       = lp.is_online
+            data["approval_status"] = lp.approval_status
+        elif user.role == User.Role.RESTAURANT and hasattr(user, "restaurant"):
+            r = user.restaurant
+            data["restaurant_id"]   = r.id
+            data["restaurant_name"] = r.name
+            data["approval_status"] = r.approval_status
+        return Response(data)
+
+    # ── PATCH ─────────────────────────────────
+    full_name = request.data.get("full_name")
+    address   = request.data.get("address")
+    lat       = request.data.get("lat")
+    lng       = request.data.get("lng")
+
+    updated_fields = []
+
+    if full_name is not None:
+        full_name = full_name.strip()
+        if not full_name:
+            return Response({"detail": "الاسم لا يمكن أن يكون فارغاً."}, status=400)
+        user.full_name = full_name
+        updated_fields.append("full_name")
+
+    if address is not None:
+        user.address = address.strip()
+        updated_fields.append("address")
+
+    if lat is not None:
+        try:
+            user.lat = float(lat)
+            updated_fields.append("lat")
+        except (TypeError, ValueError):
+            return Response({"detail": "lat يجب أن يكون رقماً."}, status=400)
+
+    if lng is not None:
+        try:
+            user.lng = float(lng)
+            updated_fields.append("lng")
+        except (TypeError, ValueError):
+            return Response({"detail": "lng يجب أن يكون رقماً."}, status=400)
+
+    # رفع الصورة الشخصية (multipart)
+    if "avatar" in request.FILES:
+        user.avatar = request.FILES["avatar"]
+        updated_fields.append("avatar")
+
+    if updated_fields:
+        user.save(update_fields=updated_fields)
+
+    return Response({
         "id":        user.id,
         "full_name": user.full_name,
         "phone":     user.phone,
         "role":      user.role,
-    }
-    return Response(data)
+        "address":   getattr(user, "address", "") or "",
+    })
