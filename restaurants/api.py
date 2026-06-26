@@ -16,26 +16,9 @@ from .models import Restaurant, RestaurantCategory, Menu, Product, WorkingHours
 
 # ─────────────────────────────────────────────
 # دالة مساعدة: بناء بيانات المطعم الكاملة للقوائم
-# تُرجع الحقول التي يتوقعها Flutter في home_screen و category_list_screen
 # ─────────────────────────────────────────────
 def _restaurant_list_data(r, request):
-    """
-    الحقول المُرجَعة:
-      id, name, restaurant_name,
-      logo, cover_image,
-      is_open,
-      rating (legacy) + avg_rating (يستخدمه category_list_screen),
-      total_orders, likes, total_likes,
-      delivery_fee, estimated_minutes,
-      lat, lng, address, city,
-      category: {id, name, image}
-    """
-    # عدد الطلبات المكتملة للمطعم
-    total_orders = Order.objects.filter(
-        restaurant=r, status="delivered"
-    ).count()
-
-    # category ككائن كامل (يحتاجه home_screen لعرض اسم التصنيف)
+    total_orders = Order.objects.filter(restaurant=r, status="delivered").count()
     cat = None
     if r.category:
         cat = {
@@ -44,33 +27,27 @@ def _restaurant_list_data(r, request):
             "image": request.build_absolute_uri(r.category.image.url)
                      if r.category.image else None,
         }
-
     rating_val = float(r.rating)
-
     return {
         "id":                r.id,
         "name":              r.name,
-        "restaurant_name":   r.name,          # alias يستخدمه category_list_screen
+        "restaurant_name":   r.name,
         "owner_name":        r.owner_name,
         "address":           r.address,
         "city":              r.city,
         "lat":               r.lat,
         "lng":               r.lng,
-        # تقييم — مزدوج لتوافق الشاشات المختلفة
         "rating":            rating_val,
         "avg_rating":        rating_val,
         "is_open":           r.is_open,
         "logo":              request.build_absolute_uri(r.logo.url) if r.logo else None,
         "cover_image":       request.build_absolute_uri(r.cover_image.url)
                              if r.cover_image else None,
-        # إحصاءات
         "total_orders":      total_orders,
-        "likes":             0,               # لا يوجد نموذج إعجاب بعد → 0
+        "likes":             0,
         "total_likes":       0,
-        # رسوم التوصيل والوقت (قيم افتراضية حتى يُضاف النموذج لاحقاً)
-        "delivery_fee":      50,              # MRU — غيّر حسب منطق عملك
+        "delivery_fee":      50,
         "estimated_minutes": 30,
-        # تصنيف كامل
         "category":          cat,
         "category_id":       r.category_id,
     }
@@ -107,7 +84,6 @@ def restaurants_list(request):
     category_id = request.query_params.get("category_id")
     if category_id:
         qs = qs.filter(category_id=category_id)
-
     data = [_restaurant_list_data(r, request) for r in qs]
     return Response(data)
 
@@ -123,7 +99,6 @@ def restaurant_detail(request, pk):
         Restaurant.objects.select_related("category"),
         pk=pk, approval_status="approved"
     )
-
     menus = []
     for menu in r.menus.filter(is_active=True):
         products = [
@@ -146,7 +121,6 @@ def restaurant_detail(request, pk):
             "time_label": menu.time_label,
             "products":   products,
         })
-
     working_hours = [
         {
             "day":        wh.day,
@@ -156,10 +130,8 @@ def restaurant_detail(request, pk):
         }
         for wh in r.working_hours.all()
     ]
-
     total_orders = Order.objects.filter(restaurant=r, status="delivered").count()
     rating_val   = float(r.rating)
-
     cat = None
     if r.category:
         cat = {
@@ -168,7 +140,6 @@ def restaurant_detail(request, pk):
             "image": request.build_absolute_uri(r.category.image.url)
                      if r.category.image else None,
         }
-
     return Response({
         "id":                r.id,
         "name":              r.name,
@@ -205,11 +176,9 @@ def restaurant_detail(request, pk):
 def my_restaurant(request):
     if request.user.role != User.Role.RESTAURANT:
         return Response({"detail": "غير مصرح."}, status=403)
-
     r = get_object_or_404(Restaurant, owner=request.user)
     total_orders = Order.objects.filter(restaurant=r, status="delivered").count()
     rating_val   = float(r.rating)
-
     return Response({
         "id":              r.id,
         "name":            r.name,
@@ -243,7 +212,6 @@ def my_restaurant(request):
 def toggle_restaurant_open(request):
     if request.user.role != User.Role.RESTAURANT:
         return Response({"detail": "غير مصرح."}, status=403)
-
     r = get_object_or_404(Restaurant, owner=request.user)
     r.is_open = not r.is_open
     r.save(update_fields=["is_open"])
@@ -259,12 +227,10 @@ def toggle_restaurant_open(request):
 def create_menu(request):
     if request.user.role != User.Role.RESTAURANT:
         return Response({"detail": "غير مصرح."}, status=403)
-
     r = get_object_or_404(Restaurant, owner=request.user)
     name = request.data.get("name", "").strip()
     if not name:
         return Response({"detail": "اسم القائمة مطلوب."}, status=400)
-
     menu = Menu.objects.create(
         restaurant=r,
         name=name,
@@ -283,15 +249,12 @@ def create_menu(request):
 def create_product(request):
     if request.user.role != User.Role.RESTAURANT:
         return Response({"detail": "غير مصرح."}, status=403)
-
     menu_id = request.data.get("menu_id")
     menu = get_object_or_404(Menu, pk=menu_id, restaurant__owner=request.user)
-
     name  = request.data.get("name", "").strip()
     price = request.data.get("price")
     if not name or not price:
         return Response({"detail": "الاسم والسعر مطلوبان."}, status=400)
-
     product = Product.objects.create(
         menu=menu,
         name=name,
@@ -320,16 +283,12 @@ def create_product(request):
 def update_product(request, pk):
     if request.user.role != User.Role.RESTAURANT:
         return Response({"detail": "غير مصرح."}, status=403)
-
     product = get_object_or_404(Product, pk=pk, menu__restaurant__owner=request.user)
-
     for field in ["name", "description", "price", "display_type", "discount_percent", "is_available"]:
         if field in request.data:
             setattr(product, field, request.data[field])
-
     if "image" in request.FILES:
         product.image = request.FILES["image"]
-
     product.save()
     return Response({
         "id":          product.id,
@@ -348,15 +307,52 @@ def update_product(request, pk):
 def delete_product(request, pk):
     if request.user.role != User.Role.RESTAURANT:
         return Response({"detail": "غير مصرح."}, status=403)
-
     product = get_object_or_404(Product, pk=pk, menu__restaurant__owner=request.user)
     product.delete()
     return Response(status=204)
 
 
 # ─────────────────────────────────────────────
+# قائمة العروض الترويجية (المنتجات المخفَّضة)
+# GET /api/promotions/
+# ─────────────────────────────────────────────
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def promotions(request):
+    products = Product.objects.filter(
+        is_available=True,
+        discount_percent__gt=0,
+        menu__restaurant__approval_status="approved",
+    ).select_related("menu__restaurant")
+
+    data = []
+    for p in products:
+        r          = p.menu.restaurant
+        orig_price = float(p.price)
+        disc       = p.discount_percent or 0
+        data.append({
+            "id":               p.id,
+            "name":             p.name,
+            "description":      p.description or "",
+            "image":            request.build_absolute_uri(p.image.url) if p.image else "",
+            "price":            orig_price,
+            "discounted_price": round(orig_price * (1 - disc / 100), 2),
+            "discount_percent": disc,
+            "display_type":     p.display_type,
+            "menu_name":        p.menu.name,
+            "restaurant": {
+                "id":   r.id,
+                "name": r.name,
+                "logo": request.build_absolute_uri(r.logo.url) if r.logo else "",
+            },
+        })
+
+    return Response(data)
+
+
+# ─────────────────────────────────────────────
 # تفاصيل منتج/عرض ترويجي
-# GET /api/restaurants/promotions/<pk>/
+# GET /api/promotions/<pk>/
 # ─────────────────────────────────────────────
 @api_view(["GET"])
 @permission_classes([AllowAny])
