@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'orders',
     'delivery',
     'dashboard',
+    'favorites',   # ← أضف هذا
 ]
 
 LOGIN_URL = 'dashboard:login'
