@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.db.models import Avg, Sum
 
 from accounts.models import User, LivreurProfile
 from orders.models import Order, OrderStatusHistory
@@ -33,18 +34,18 @@ def available_orders(request):
 
     data = [
         {
-            "id":               o.id,
-            "order_type":       o.order_type,
-            "pickup_address":   o.pickup_address,
-            "pickup_lat":       o.pickup_lat,
-            "pickup_lng":       o.pickup_lng,
-            "dropoff_address":  o.dropoff_address,
-            "dropoff_lat":      o.dropoff_lat,
-            "dropoff_lng":      o.dropoff_lng,
-            "delivery_fee":     float(o.delivery_fee),
-            "distance_km":      o.distance_km,
-            "estimated_minutes":o.estimated_minutes,
-            "restaurant":       {"id": o.restaurant.id, "name": o.restaurant.name} if o.restaurant else None,
+            "id":                o.id,
+            "order_type":        o.order_type,
+            "pickup_address":    o.pickup_address,
+            "pickup_lat":        o.pickup_lat,
+            "pickup_lng":        o.pickup_lng,
+            "dropoff_address":   o.dropoff_address,
+            "dropoff_lat":       o.dropoff_lat,
+            "dropoff_lng":       o.dropoff_lng,
+            "delivery_fee":      float(o.delivery_fee),
+            "distance_km":       o.distance_km,
+            "estimated_minutes": o.estimated_minutes,
+            "restaurant":        {"id": o.restaurant.id, "name": o.restaurant.name} if o.restaurant else None,
         }
         for o in orders
     ]
@@ -65,10 +66,15 @@ def accept_order(request, order_id):
     if profile.approval_status != "approved":
         return Response({"detail": "حسابك قيد المراجعة."}, status=403)
 
-    order = get_object_or_404(Order, pk=order_id, status=Order.Status.SEARCHING_LIVREUR, livreur__isnull=True)
+    order = get_object_or_404(
+        Order,
+        pk=order_id,
+        status=Order.Status.SEARCHING_LIVREUR,
+        livreur__isnull=True,
+    )
 
     order.livreur = request.user
-    order.status = Order.Status.ACCEPTED
+    order.status  = Order.Status.ACCEPTED
     order.save(update_fields=["livreur", "status"])
     OrderStatusHistory.objects.create(order=order, status=Order.Status.ACCEPTED)
 
@@ -89,9 +95,9 @@ def update_order_status(request, order_id):
     order = get_object_or_404(Order, pk=order_id, livreur=request.user)
 
     allowed_transitions = {
-        Order.Status.ACCEPTED:    [Order.Status.PICKED_UP],
-        Order.Status.PICKED_UP:   [Order.Status.ON_THE_WAY],
-        Order.Status.ON_THE_WAY:  [Order.Status.DELIVERED],
+        Order.Status.ACCEPTED:   [Order.Status.PICKED_UP],
+        Order.Status.PICKED_UP:  [Order.Status.ON_THE_WAY],
+        Order.Status.ON_THE_WAY: [Order.Status.DELIVERED],
     }
 
     new_status = request.data.get("status")
@@ -100,7 +106,10 @@ def update_order_status(request, order_id):
 
     allowed = [s.value for s in allowed_transitions.get(order.status, [])]
     if new_status not in allowed:
-        return Response({"detail": f"لا يمكن الانتقال من '{order.status}' إلى '{new_status}'."}, status=400)
+        return Response(
+            {"detail": f"لا يمكن الانتقال من '{order.status}' إلى '{new_status}'."},
+            status=400,
+        )
 
     order.status = new_status
     order.save(update_fields=["status"])
@@ -133,13 +142,11 @@ def update_location(request, order_id):
     if lat is None or lng is None:
         return Response({"detail": "lat و lng مطلوبان."}, status=400)
 
-    # تحديث الموقع الحالي في الـ profile
     profile = request.user.livreur_profile
     profile.current_lat = lat
     profile.current_lng = lng
     profile.save(update_fields=["current_lat", "current_lng"])
 
-    # حفظ نقطة تتبع
     LiveTrackingPoint.objects.create(order=order, lat=lat, lng=lng)
 
     return Response({"detail": "تم تحديث الموقع."})
@@ -147,7 +154,7 @@ def update_location(request, order_id):
 
 # ─────────────────────────────────────────────
 # آخر موقع للمندوب (للعميل في شاشة التتبع)
-# GET /api/delivery/<order_id>/location/
+# GET /api/delivery/<order_id>/location/get/
 # ─────────────────────────────────────────────
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -161,7 +168,11 @@ def get_livreur_location(request, order_id):
     if not point:
         return Response({"detail": "لا يوجد موقع بعد."}, status=404)
 
-    return Response({"lat": point.lat, "lng": point.lng, "timestamp": point.timestamp.isoformat()})
+    return Response({
+        "lat":       point.lat,
+        "lng":       point.lng,
+        "timestamp": point.timestamp.isoformat(),
+    })
 
 
 # ─────────────────────────────────────────────
@@ -200,7 +211,6 @@ def my_deliveries(request):
 
     data = []
     for o in orders:
-        # آخر سجل بحالة "delivered" لمعرفة وقت التسليم الفعلي
         delivered_record = next(
             (h for h in sorted(o.status_history.all(), key=lambda h: h.timestamp, reverse=True)
              if h.status == Order.Status.DELIVERED),
@@ -226,7 +236,7 @@ def my_deliveries(request):
 
 
 # ─────────────────────────────────────────────
-# رصيد المندوب
+# رصيد المندوب مع إحصائيات الأسبوع والتقييم
 # GET /api/delivery/balance/
 # ─────────────────────────────────────────────
 @api_view(["GET"])
@@ -237,17 +247,63 @@ def my_balance(request):
 
     profile = get_object_or_404(LivreurProfile, user=request.user)
 
+    # ── اليوم ──
     today = timezone.localdate()
-    today_count = Order.objects.filter(
+    today_count = (
+        Order.objects
+        .filter(
+            livreur=request.user,
+            status=Order.Status.DELIVERED,
+            status_history__status=Order.Status.DELIVERED,
+            status_history__timestamp__date=today,
+        )
+        .distinct()
+        .count()
+    )
+
+    # ── بداية الأسبوع الحالي (الإثنين) ──
+    week_start = today - timezone.timedelta(days=today.weekday())
+
+    delivered_this_week = Order.objects.filter(
         livreur=request.user,
         status=Order.Status.DELIVERED,
         status_history__status=Order.Status.DELIVERED,
-        status_history__timestamp__date=today,
-    ).distinct().count()
+        status_history__timestamp__date__gte=week_start,
+    ).distinct()
+
+    # مجموع رسوم التوصيل الإجمالية (قبل العمولة) هذا الأسبوع
+    weekly_earnings_before_commission = (
+        delivered_this_week
+        .aggregate(total=Sum("delivery_fee"))["total"] or 0
+    )
+
+    # مجموع ما وصل للمندوب فعلياً (بعد العمولة) هذا الأسبوع
+    weekly_earnings = (
+        delivered_this_week
+        .aggregate(total=Sum("livreur_net_fee"))["total"] or 0
+    )
+
+    # ── متوسط التقييم ──
+    # نفترض وجود حقل rating في Order يُملأ من قِبل العميل
+    # إذا لم يكن موجوداً بعد يُرجع null
+    avg_rating_result = (
+        Order.objects
+        .filter(
+            livreur=request.user,
+            status=Order.Status.DELIVERED,
+            rating__isnull=False,
+        )
+        .aggregate(avg=Avg("rating"))["avg"]
+    )
+    average_rating = round(float(avg_rating_result), 2) if avg_rating_result else None
 
     return Response({
-        "balance":         float(profile.balance),
-        "commission_rate": float(profile.commission_rate),
-        "is_online":       profile.is_online,
-        "today_count":     today_count,
+        "balance":                          float(profile.balance),
+        "commission_rate":                  float(profile.commission_rate),
+        "is_online":                        profile.is_online,
+        "today_count":                      today_count,
+        # ✅ جديد
+        "weekly_earnings":                  float(weekly_earnings),
+        "weekly_earnings_before_commission": float(weekly_earnings_before_commission),
+        "average_rating":                   average_rating,
     })
