@@ -4,11 +4,12 @@
 {% block content %}
 <div class="page-header">
     <h1>المطاعم</h1>
+    <a href="{% url 'dashboard:restaurant_create' %}" class="btn btn-primary">+ إضافة مطعم</a>
 </div>
 
 <div class="filters">
-    <a href="?status=all" class="{% if current_status == 'all' %}active{% endif %}">الكل</a>
-    <a href="?status=pending" class="{% if current_status == 'pending' %}active{% endif %}">قيد المراجعة</a>
+    <a href="?status=all"      class="{% if current_status == 'all' %}active{% endif %}">الكل</a>
+    <a href="?status=pending"  class="{% if current_status == 'pending' %}active{% endif %}">قيد المراجعة</a>
     <a href="?status=approved" class="{% if current_status == 'approved' %}active{% endif %}">موافق عليها</a>
     <a href="?status=rejected" class="{% if current_status == 'rejected' %}active{% endif %}">مرفوضة</a>
 </div>
@@ -24,17 +25,22 @@
                 <th>المدينة</th>
                 <th>الحالة</th>
                 <th>تاريخ التسجيل</th>
+                <th>إجراءات</th>
             </tr>
         </thead>
         <tbody>
             {% for r in restaurants %}
-            <tr onclick="window.location='{% url 'dashboard:restaurant_detail' r.pk %}'" style="cursor:pointer">
-                <td>{{ r.name }}</td>
+            <tr>
+                <td><a href="{% url 'dashboard:restaurant_detail' r.pk %}">{{ r.name }}</a></td>
                 <td>{{ r.owner_name }}</td>
                 <td>{{ r.category.name|default:"—" }}</td>
                 <td>{{ r.city }}</td>
                 <td><span class="status-pill status-{{ r.approval_status }}">{{ r.get_approval_status_display }}</span></td>
                 <td>{{ r.created_at|date:"Y-m-d" }}</td>
+                <td class="actions-cell">
+                    <a href="{% url 'dashboard:restaurant_edit' r.pk %}" class="btn btn-outline btn-sm">تعديل</a>
+                    <a href="{% url 'dashboard:restaurant_delete' r.pk %}" class="btn btn-danger btn-sm">حذف</a>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
