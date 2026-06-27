@@ -15,6 +15,7 @@ urlpatterns = [
     path("products/<int:pk>/delete/", api.delete_product,         name="delete-product"),
     path("promotions/",               api.promotions,             name="promotions-list"),
     path("promotions/<int:pk>/",      api.promotion_detail,       name="promotion-detail"),
-    # ⚠️ مؤقت — احذفه بعد ترحيل الصور
+    # ⚠️ مؤقت — احذفهما بعد الانتهاء
     path("migrate-images/",           api.migrate_images,         name="migrate-images"),
+    path("clear-broken-images/",      api.clear_broken_images,    name="clear-broken-images"),
 ]
