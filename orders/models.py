@@ -8,9 +8,6 @@ class Order(models.Model):
     طلب موحّد يدعم نوعين (مطابق لـ OrderType في livreur_order_types.dart):
     - FOOD: طلبية من مطعم (له restaurant و OrderItems)
     - PARCEL: توصيلة طرد مباشرة (بدون مطعم، فقط من → إلى)
-
-    تسمية الحقول في الكود تُطابق المعنى الفعلي بالعربية بدل تسمية Flutter
-    الداخلية المربكة (ride/delivery) لتفادي الالتباس مستقبلاً.
     """
 
     class OrderType(models.TextChoices):
@@ -18,7 +15,7 @@ class Order(models.Model):
         PARCEL = "parcel", "توصيلة طرد"
 
     class Status(models.TextChoices):
-        PENDING = "pending", "بانتظار تأكيد المطعم"   # فقط لطلبات FOOD
+        PENDING = "pending", "بانتظار تأكيد المطعم"
         CONFIRMED = "confirmed", "تم تأكيد البائع"
         SEARCHING_LIVREUR = "searching_livreur", "جاري البحث عن مندوب"
         ACCEPTED = "accepted", "تم قبول المندوب"
@@ -31,45 +28,42 @@ class Order(models.Model):
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name="orders")
     restaurant = models.ForeignKey(
         Restaurant, on_delete=models.SET_NULL, null=True, blank=True, related_name="orders"
-    )  # فارغ إذا كان order_type = parcel
+    )
     livreur = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deliveries"
     )
 
     status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING)
 
-    # نقطة الانطلاق (المطعم تلقائياً لطلبات FOOD، أو نقطة يحددها العميل لطلبات PARCEL)
     pickup_address = models.CharField(max_length=255)
     pickup_lat = models.FloatField()
     pickup_lng = models.FloatField()
 
-    # نقطة الوصول (عنوان العميل)
     dropoff_address = models.CharField(max_length=255)
     dropoff_lat = models.FloatField()
     dropoff_lng = models.FloatField()
 
-    # تفاصيل إضافية لطلبات الطرد فقط (لا توجد حالياً في الـ UI، لكنها ضرورية للـ backend)
     recipient_name = models.CharField(max_length=150, blank=True)
     recipient_phone = models.CharField(max_length=20, blank=True)
     parcel_notes = models.TextField(blank=True)
 
-    # الأسعار
-    items_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # فقط FOOD
+    items_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
-    # المسافة والوقت المقدّر (يُحسب عند إنشاء الطلب عبر خرائط)
     distance_km = models.FloatField(null=True, blank=True)
     estimated_minutes = models.PositiveIntegerField(null=True, blank=True)
 
-    payment_method = models.CharField(max_length=20, default="cash")  # الدفع عند الاستلام فقط حالياً
+    payment_method = models.CharField(max_length=20, default="cash")
+
+    # ✅ حقل التقييم — مضاف
+    rating = models.FloatField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     @property
     def livreur_commission(self):
-        """عمولة التطبيق من المندوب (10% من رسوم التوصيل)."""
         if self.livreur and hasattr(self.livreur, "livreur_profile"):
             rate = self.livreur.livreur_profile.commission_rate
         else:
@@ -78,12 +72,10 @@ class Order(models.Model):
 
     @property
     def livreur_net_fee(self):
-        """صافي ما يربحه المندوب من رسوم التوصيل."""
         return self.delivery_fee - self.livreur_commission
 
     @property
     def restaurant_amount(self):
-        """المبلغ الذي يُحوَّل للمطعم (90% من سعر الطلبية) — لطلبات FOOD فقط."""
         if self.order_type == self.OrderType.FOOD:
             return self.items_price * 0.90
         return 0
@@ -93,13 +85,9 @@ class Order(models.Model):
 
 
 class OrderItem(models.Model):
-    """
-    أصناف الطعام ضمن طلب من نوع FOOD (السلة المحوّلة إلى طلب فعلي).
-    """
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, related_name="order_items")
 
-    # ننسخ الاسم والسعر وقت الطلب لأن المنتج قد يتغير سعره لاحقاً
     product_name = models.CharField(max_length=150)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     quantity = models.PositiveIntegerField(default=1)
@@ -113,9 +101,6 @@ class OrderItem(models.Model):
 
 
 class OrderStatusHistory(models.Model):
-    """
-    سجل تتبع تغيّر حالة الطلب — مفيد لشاشة التتبع الحي عند العميل والمندوب.
-    """
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="status_history")
     status = models.CharField(max_length=30, choices=Order.Status.choices)
     timestamp = models.DateTimeField(auto_now_add=True)
