@@ -1,6 +1,5 @@
 {% extends "dashboard/base.html" %}
 {% block title %}الفئات — wassel{% endblock %}
-
 {% block content %}
 <div class="page-header">
     <h1>فئات المطاعم</h1>
@@ -22,17 +21,43 @@
     <h2>الفئات الحالية</h2>
     {% if categories %}
     <table>
-        <thead><tr><th>الاسم</th><th>عدد المطاعم</th><th></th></tr></thead>
+        <thead>
+            <tr><th>الاسم</th><th>عدد المطاعم</th><th>إجراءات</th></tr>
+        </thead>
         <tbody>
             {% for cat in categories %}
-            <tr>
-                <td>{{ cat.name }}</td>
+            <tr id="cat-row-{{ cat.pk }}">
+                <!-- وضع العرض -->
+                <td class="cat-display-name">{{ cat.name }}</td>
                 <td>{{ cat.restaurants.count }}</td>
                 <td>
-                    <form method="post" action="{% url 'dashboard:category_delete' cat.pk %}" onsubmit="return confirm('هل تريد حذف هذه الفئة؟');">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-danger btn-sm">حذف</button>
-                    </form>
+                    <!-- أزرار وضع العرض -->
+                    <div class="cat-view-actions" style="display:flex; gap:6px;">
+                        <button type="button" class="btn btn-outline btn-sm"
+                                onclick="startEditCat({{ cat.pk }}, '{{ cat.name|escapejs }}')">
+                            تعديل
+                        </button>
+                        <form method="post" action="{% url 'dashboard:category_delete' cat.pk %}"
+                              onsubmit="return confirm('هل تريد حذف هذه الفئة؟');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm">حذف</button>
+                        </form>
+                    </div>
+
+                    <!-- وضع التعديل (مخفي في البداية) -->
+                    <div class="cat-edit-actions" style="display:none;">
+                        <form method="post" action="{% url 'dashboard:category_edit' cat.pk %}"
+                              style="display:flex; gap:6px; align-items:center;">
+                            {% csrf_token %}
+                            <input type="text" name="name" id="cat-input-{{ cat.pk }}"
+                                   style="padding:5px 10px; border:1px solid #ccc; border-radius:6px; font-size:14px; min-width:160px;">
+                            <button type="submit" class="btn btn-primary btn-sm">حفظ</button>
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="cancelEditCat({{ cat.pk }}, '{{ cat.name|escapejs }}')">
+                                إلغاء
+                            </button>
+                        </form>
+                    </div>
                 </td>
             </tr>
             {% endfor %}
@@ -42,4 +67,33 @@
     <div class="empty-state">لا توجد فئات بعد.</div>
     {% endif %}
 </div>
+
+<script>
+function startEditCat(pk, currentName) {
+    var row = document.getElementById('cat-row-' + pk);
+    var input = document.getElementById('cat-input-' + pk);
+
+    // ① أولاً: ملء الـ input بالاسم الحالي قبل أي شيء
+    input.value = currentName;
+
+    // ② إخفاء أزرار العرض وإظهار أزرار التعديل
+    row.querySelector('.cat-view-actions').style.display = 'none';
+    row.querySelector('.cat-edit-actions').style.display = 'flex';
+
+    // ③ تركيز على الحقل وتحديد النص
+    input.focus();
+    input.select();
+}
+
+function cancelEditCat(pk, originalName) {
+    var row = document.getElementById('cat-row-' + pk);
+
+    // إعادة القيمة الأصلية
+    document.getElementById('cat-input-' + pk).value = originalName;
+
+    // العودة لوضع العرض
+    row.querySelector('.cat-edit-actions').style.display = 'none';
+    row.querySelector('.cat-view-actions').style.display = 'flex';
+}
+</script>
 {% endblock %}
