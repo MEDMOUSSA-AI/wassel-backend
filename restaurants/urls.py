@@ -8,8 +8,11 @@ urlpatterns = [
     path("mine/",                          api.my_restaurant,          name="my-restaurant"),
     path("mine/toggle-open/",              api.toggle_restaurant_open, name="toggle-open"),
     path("menus/",                         api.create_menu,            name="create-menu"),
+    path("menus/<int:pk>/",                api.update_menu,            name="update-menu"),    # ✅ PATCH
+    path("menus/<int:pk>/delete/",         api.delete_menu,            name="delete-menu"),    # ✅ DELETE
     path("products/",                      api.create_product,         name="create-product"),
     path("products/<int:pk>/",             api.update_product,         name="update-product"),
     path("products/<int:pk>/delete/",      api.delete_product,         name="delete-product"),
+    path("promotions/",                    api.promotions,             name="promotions-list"),  # ✅ GET
     path("promotions/<int:pk>/",           api.promotion_detail,       name="promotion-detail"),
 ]
