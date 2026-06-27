@@ -441,6 +441,24 @@ def promotion_detail(request, pk):
 
 
 # ─────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# ⚠️  endpoint مؤقت — يمسح مسارات الصور المكسورة (المحلية)
+# GET /api/restaurants/clear-broken-images/
+# احذفه بعد الانتهاء
+# ─────────────────────────────────────────────
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def clear_broken_images(request):
+    cleared = []
+    for p in Product.objects.exclude(image="").exclude(image=None):
+        url = str(p.image)
+        if not url.startswith("http"):
+            cleared.append({"id": p.id, "name": p.name, "old_path": url})
+            p.image = ""
+            p.save(update_fields=["image"])
+    return Response({"cleared": len(cleared), "details": cleared})
+
+
 # ⚠️  endpoint مؤقت لاختبار Cloudinary وترحيل الصور
 # GET /api/restaurants/migrate-images/
 # احذفه بعد التأكد من عمل كل شيء
