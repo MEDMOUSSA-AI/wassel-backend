@@ -7,36 +7,38 @@ from django.http import JsonResponse
 import os, cloudinary, cloudinary.uploader
 
 def cloudinary_test(request):
-    # اختبار رفع صورة بسيطة لـ Cloudinary
+    # صورة 1x1 pixel بـ base64
+    import base64
+    tiny_png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    )
     try:
+        import tempfile, os as _os
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            f.write(tiny_png)
+            tmp_path = f.name
         result = cloudinary.uploader.upload(
-            "https://via.placeholder.com/100.png",
+            tmp_path,
             folder="wassel/test",
             public_id="test_connection"
         )
+        _os.unlink(tmp_path)
         return JsonResponse({
-            'status': 'success',
+            'status': 'success ✅',
             'url': result.get('secure_url'),
             'cloud_name': os.getenv('CLOUDINARY_CLOUD_NAME'),
         })
     except Exception as e:
         return JsonResponse({
-            'status': 'error',
+            'status': 'error ❌',
             'error': str(e),
-            'cloud_name': os.getenv('CLOUDINARY_CLOUD_NAME'),
-            'api_key': os.getenv('CLOUDINARY_API_KEY'),
-            'has_secret': bool(os.getenv('CLOUDINARY_API_SECRET')),
         })
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('dashboard/', include('dashboard.urls')),
     path('', RedirectView.as_view(url='/dashboard/', permanent=False)),
-
-    # ── اختبار مؤقت ──
     path('test-cloudinary/', cloudinary_test),
-
-    # REST API
     path('api/auth/',          include('accounts.urls')),
     path('api/restaurants/',   include('restaurants.urls')),
     path('api/orders/',        include('orders.urls')),
