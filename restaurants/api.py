@@ -438,3 +438,59 @@ def promotion_detail(request, pk):
             "logo": _image_url(r.logo, request),
         },
     })
+
+
+# ─────────────────────────────────────────────
+# ⚠️  endpoint مؤقت لاختبار Cloudinary وترحيل الصور
+# GET /api/restaurants/migrate-images/
+# احذفه بعد التأكد من عمل كل شيء
+# ─────────────────────────────────────────────
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def migrate_images(request):
+    import cloudinary.uploader
+    import os
+
+    # ── اختبار المتغيرات ──
+    cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME')
+    api_key    = os.getenv('CLOUDINARY_API_KEY')
+    api_secret = os.getenv('CLOUDINARY_API_SECRET')
+
+    if not all([cloud_name, api_key, api_secret]):
+        return Response({
+            "error":      "متغيرات Cloudinary مفقودة",
+            "cloud_name": cloud_name or "❌ مفقود",
+            "api_key":    api_key    or "❌ مفقود",
+            "api_secret": "✅ موجود" if api_secret else "❌ مفقود",
+        }, status=500)
+
+    results = {"success": [], "failed": [], "skipped": []}
+
+    for p in Product.objects.exclude(image="").exclude(image=None):
+        url = str(p.image)
+        if url.startswith("http"):
+            results["skipped"].append({"id": p.id, "name": p.name, "url": url})
+            continue
+        try:
+            full_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "media", url
+            )
+            result = cloudinary.uploader.upload(
+                full_path,
+                public_id=f"wassel/products/{p.id}",
+                overwrite=True,
+            )
+            p.image = result["secure_url"]
+            p.save(update_fields=["image"])
+            results["success"].append({"id": p.id, "name": p.name, "url": result["secure_url"]})
+        except Exception as e:
+            results["failed"].append({"id": p.id, "name": p.name, "error": str(e)})
+
+    return Response({
+        "cloudinary": f"✅ {cloud_name}",
+        "migrated":   len(results["success"]),
+        "skipped":    len(results["skipped"]),
+        "failed":     len(results["failed"]),
+        "details":    results,
+    })
