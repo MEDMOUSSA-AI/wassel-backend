@@ -239,6 +239,45 @@ def toggle_restaurant_open(request):
 
 
 # ─────────────────────────────────────────────
+# رفع لوجو المطعم وصورة الغلاف
+# PATCH /api/restaurants/mine/images/
+# form-data: logo (file, اختياري), cover_image (file, اختياري)
+# ─────────────────────────────────────────────
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def update_restaurant_images(request):
+    if request.user.role != User.Role.RESTAURANT:
+        return Response({"detail": "غير مصرح."}, status=403)
+
+    r = get_object_or_404(Restaurant, owner=request.user)
+
+    updated = []
+
+    if "logo" in request.FILES:
+        r.logo = request.FILES["logo"]
+        updated.append("logo")
+
+    if "cover_image" in request.FILES:
+        r.cover_image = request.FILES["cover_image"]
+        updated.append("cover_image")
+
+    if not updated:
+        return Response(
+            {"detail": "لم يتم إرسال أي صورة. أرسل logo أو cover_image أو كليهما."},
+            status=400,
+        )
+
+    r.save(update_fields=updated)
+
+    return Response({
+        "detail":      f"تم تحديث: {', '.join(updated)}",
+        "logo":        _image_url(r.logo, request),
+        "cover_image": _image_url(r.cover_image, request),
+    })
+
+
+# ─────────────────────────────────────────────
 # إنشاء قائمة جديدة
 # POST /api/restaurants/menus/
 # ─────────────────────────────────────────────
@@ -444,7 +483,6 @@ def promotion_detail(request, pk):
 
 
 # ─────────────────────────────────────────────
-# ─────────────────────────────────────────────
 # ⚠️  endpoint مؤقت — يمسح مسارات الصور المكسورة (المحلية)
 # GET /api/restaurants/clear-broken-images/
 # احذفه بعد الانتهاء
@@ -462,6 +500,7 @@ def clear_broken_images(request):
     return Response({"cleared": len(cleared), "details": cleared})
 
 
+# ─────────────────────────────────────────────
 # ⚠️  endpoint مؤقت لاختبار Cloudinary وترحيل الصور
 # GET /api/restaurants/migrate-images/
 # احذفه بعد التأكد من عمل كل شيء
