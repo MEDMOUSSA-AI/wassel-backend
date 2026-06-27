@@ -21,11 +21,11 @@ urlpatterns = [
     path("products/<int:pk>/delete/",                      views.product_delete,     name="product_delete"),
 
     # ── المناديب ──
-    path("livreurs/",                views.livreurs_list,  name="livreurs"),
-    path("livreurs/add/",            views.livreur_create, name="livreur_create"),
-    path("livreurs/<int:pk>/",       views.livreur_detail, name="livreur_detail"),
-    path("livreurs/<int:pk>/edit/",  views.livreur_edit,   name="livreur_edit"),
-    path("livreurs/<int:pk>/delete/",views.livreur_delete, name="livreur_delete"),
+    path("livreurs/",                 views.livreurs_list,  name="livreurs"),
+    path("livreurs/add/",             views.livreur_create, name="livreur_create"),
+    path("livreurs/<int:pk>/",        views.livreur_detail, name="livreur_detail"),
+    path("livreurs/<int:pk>/edit/",   views.livreur_edit,   name="livreur_edit"),
+    path("livreurs/<int:pk>/delete/", views.livreur_delete, name="livreur_delete"),
 
     # ── الطلبات ──
     path("orders/",          views.orders_list,  name="orders"),
@@ -35,6 +35,7 @@ urlpatterns = [
     path("clients/", views.clients_list, name="clients"),
 
     # ── الفئات ──
-    path("categories/",                   views.categories_list,  name="categories"),
-    path("categories/<int:pk>/delete/",   views.category_delete,  name="category_delete"),
+    path("categories/",                  views.categories_list, name="categories"),
+    path("categories/<int:pk>/delete/",  views.category_delete, name="category_delete"),
+    path("categories/<int:pk>/edit/",    views.category_edit,   name="category_edit"),   # ← جديد
 ]
