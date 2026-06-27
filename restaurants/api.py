@@ -1,6 +1,5 @@
 """
 restaurants/api.py — API المطاعم والقوائم والمنتجات
-المسار: restaurants/api.py
 """
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -15,21 +14,27 @@ from .models import Restaurant, RestaurantCategory, Menu, Product, WorkingHours
 
 # ─────────────────────────────────────────────
 # دالة مساعدة: بناء رابط الصورة
-# تتعامل مع Cloudinary (رابط كامل) والملفات المحلية على حدٍّ سواء
+# ✅ تتعامل مع 3 حالات:
+#    1. Cloudinary URL كامل → يُرجع مباشرة
+#    2. مسار محلي قديم     → يُرجع "" بدل 404
+#    3. حقل فارغ           → يُرجع ""
 # ─────────────────────────────────────────────
-def _image_url(image_field, request):
+def _image_url(image_field, request=None):
     if not image_field:
-        return None
-    url = image_field.url
+        return ""
+    try:
+        url = image_field.url
+    except Exception:
+        return ""
     # Cloudinary يُرجع رابطاً كاملاً يبدأ بـ http
     if url.startswith("http://") or url.startswith("https://"):
         return url
-    # ملف محلي — نبني الرابط الكامل
-    return request.build_absolute_uri(url)
+    # ✅ مسار محلي قديم — أرجع "" بدل رابط مكسور يُسبب 404
+    return ""
 
 
 # ─────────────────────────────────────────────
-# دالة مساعدة: بناء بيانات المطعم الكاملة للقوائم
+# دالة مساعدة: بناء بيانات المطعم للقوائم
 # ─────────────────────────────────────────────
 def _restaurant_list_data(r, request):
     total_orders = Order.objects.filter(restaurant=r, status="delivered").count()
@@ -85,7 +90,7 @@ def categories_list(request):
 
 
 # ─────────────────────────────────────────────
-# قائمة المطاعم المتاحة للعملاء
+# قائمة المطاعم
 # GET /api/restaurants/
 # GET /api/restaurants/?category_id=<id>
 # ─────────────────────────────────────────────
@@ -133,6 +138,7 @@ def restaurant_detail(request, pk):
             "time_label": menu.time_label,
             "products":   products,
         })
+
     working_hours = [
         {
             "day":        wh.day,
@@ -142,6 +148,7 @@ def restaurant_detail(request, pk):
         }
         for wh in r.working_hours.all()
     ]
+
     total_orders = Order.objects.filter(restaurant=r, status="delivered").count()
     rating_val   = float(r.rating)
     cat = None
@@ -151,6 +158,7 @@ def restaurant_detail(request, pk):
             "name":  r.category.name,
             "image": _image_url(r.category.image, request),
         }
+
     return Response({
         "id":                r.id,
         "name":              r.name,
@@ -178,7 +186,7 @@ def restaurant_detail(request, pk):
 
 
 # ─────────────────────────────────────────────
-# بيانات المطعم الخاص بالمالك (لوحة التحكم)
+# بيانات المطعم الخاص بالمالك
 # GET /api/restaurants/mine/
 # ─────────────────────────────────────────────
 @api_view(["GET"])
@@ -190,24 +198,24 @@ def my_restaurant(request):
     total_orders = Order.objects.filter(restaurant=r, status="delivered").count()
     rating_val   = float(r.rating)
     return Response({
-        "id":              r.id,
-        "name":            r.name,
-        "restaurant_name": r.name,
-        "owner_name":      r.owner_name,
-        "address":         r.address,
-        "city":            r.city,
-        "lat":             r.lat,
-        "lng":             r.lng,
-        "rating":          rating_val,
-        "avg_rating":      rating_val,
-        "is_open":         r.is_open,
-        "approval_status": r.approval_status,
-        "logo":            _image_url(r.logo, request),
-        "cover_image":     _image_url(r.cover_image, request),
-        "total_orders":    total_orders,
-        "likes":           0,
-        "total_likes":     0,
-        "delivery_fee":    50,
+        "id":                r.id,
+        "name":              r.name,
+        "restaurant_name":   r.name,
+        "owner_name":        r.owner_name,
+        "address":           r.address,
+        "city":              r.city,
+        "lat":               r.lat,
+        "lng":               r.lng,
+        "rating":            rating_val,
+        "avg_rating":        rating_val,
+        "is_open":           r.is_open,
+        "approval_status":   r.approval_status,
+        "logo":              _image_url(r.logo, request),
+        "cover_image":       _image_url(r.cover_image, request),
+        "total_orders":      total_orders,
+        "likes":             0,
+        "total_likes":       0,
+        "delivery_fee":      50,
         "estimated_minutes": 30,
     })
 
@@ -249,6 +257,45 @@ def create_menu(request):
 
 
 # ─────────────────────────────────────────────
+# تعديل قائمة
+# PATCH /api/restaurants/menus/<id>/
+# ─────────────────────────────────────────────
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def update_menu(request, pk):
+    if request.user.role != User.Role.RESTAURANT:
+        return Response({"detail": "غير مصرح."}, status=403)
+    menu = get_object_or_404(Menu, pk=pk, restaurant__owner=request.user)
+    updated = []
+    if "name" in request.data:
+        name = request.data["name"].strip()
+        if not name:
+            return Response({"detail": "اسم القائمة لا يمكن أن يكون فارغاً."}, status=400)
+        menu.name = name
+        updated.append("name")
+    if "time_label" in request.data:
+        menu.time_label = request.data["time_label"]
+        updated.append("time_label")
+    if updated:
+        menu.save(update_fields=updated)
+    return Response({"id": menu.id, "name": menu.name, "time_label": menu.time_label})
+
+
+# ─────────────────────────────────────────────
+# حذف قائمة
+# DELETE /api/restaurants/menus/<id>/
+# ─────────────────────────────────────────────
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_menu(request, pk):
+    if request.user.role != User.Role.RESTAURANT:
+        return Response({"detail": "غير مصرح."}, status=403)
+    menu = get_object_or_404(Menu, pk=pk, restaurant__owner=request.user)
+    menu.delete()
+    return Response(status=204)
+
+
+# ─────────────────────────────────────────────
 # إضافة منتج لقائمة
 # POST /api/restaurants/products/
 # ─────────────────────────────────────────────
@@ -259,9 +306,9 @@ def create_product(request):
     if request.user.role != User.Role.RESTAURANT:
         return Response({"detail": "غير مصرح."}, status=403)
     menu_id = request.data.get("menu_id")
-    menu = get_object_or_404(Menu, pk=menu_id, restaurant__owner=request.user)
-    name  = request.data.get("name", "").strip()
-    price = request.data.get("price")
+    menu    = get_object_or_404(Menu, pk=menu_id, restaurant__owner=request.user)
+    name    = request.data.get("name", "").strip()
+    price   = request.data.get("price")
     if not name or not price:
         return Response({"detail": "الاسم والسعر مطلوبان."}, status=400)
     product = Product.objects.create(
@@ -322,7 +369,7 @@ def delete_product(request, pk):
 
 
 # ─────────────────────────────────────────────
-# قائمة العروض الترويجية (المنتجات المخفَّضة)
+# قائمة العروض الترويجية
 # GET /api/promotions/
 # ─────────────────────────────────────────────
 @api_view(["GET"])
@@ -343,7 +390,7 @@ def promotions(request):
             "id":               p.id,
             "name":             p.name,
             "description":      p.description or "",
-            "image":            _image_url(p.image, request) or "",
+            "image":            _image_url(p.image, request),
             "price":            orig_price,
             "discounted_price": round(orig_price * (1 - disc / 100), 2),
             "discount_percent": disc,
@@ -352,7 +399,7 @@ def promotions(request):
             "restaurant": {
                 "id":   r.id,
                 "name": r.name,
-                "logo": _image_url(r.logo, request) or "",
+                "logo": _image_url(r.logo, request),
             },
         })
 
@@ -379,7 +426,7 @@ def promotion_detail(request, pk):
         "id":               p.id,
         "name":             p.name,
         "description":      p.description or "",
-        "image":            _image_url(p.image, request) or "",
+        "image":            _image_url(p.image, request),
         "price":            orig_price,
         "discounted_price": round(orig_price * (1 - disc / 100), 2),
         "discount_percent": disc,
@@ -388,6 +435,6 @@ def promotion_detail(request, pk):
         "restaurant": {
             "id":   r.id,
             "name": r.name,
-            "logo": _image_url(r.logo, request) or "",
+            "logo": _image_url(r.logo, request),
         },
     })
