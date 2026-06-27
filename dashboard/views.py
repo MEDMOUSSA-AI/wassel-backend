@@ -190,13 +190,20 @@ def restaurant_edit(request, pk):
     categories = RestaurantCategory.objects.all()
 
     if request.method == "POST":
-        restaurant.name        = request.POST.get("name", "").strip() or restaurant.name
-        restaurant.owner_name  = request.POST.get("owner_name", "").strip() or restaurant.owner_name
-        restaurant.address     = request.POST.get("address", "").strip() or restaurant.address
-        restaurant.city        = request.POST.get("city", "").strip() or restaurant.city
+        restaurant.name         = request.POST.get("name", "").strip() or restaurant.name
+        restaurant.owner_name   = request.POST.get("owner_name", "").strip() or restaurant.owner_name
+        restaurant.address      = request.POST.get("address", "").strip() or restaurant.address
+        restaurant.city         = request.POST.get("city", "").strip() or restaurant.city
         restaurant.bank_account = request.POST.get("bank_account", "").strip()
-        category_id            = request.POST.get("category") or None
-        restaurant.category_id = category_id
+        category_id             = request.POST.get("category") or None
+        restaurant.category_id  = category_id
+
+        # ✅ رفع الشعار وصورة الغلاف على Cloudinary
+        if request.FILES.get("logo"):
+            restaurant.logo = request.FILES["logo"]
+        if request.FILES.get("cover_image"):
+            restaurant.cover_image = request.FILES["cover_image"]
+
         restaurant.save()
         messages.success(request, f"تم تعديل بيانات مطعم «{restaurant.name}» بنجاح.")
         return redirect("dashboard:restaurant_detail", pk=pk)
@@ -238,15 +245,15 @@ def product_create(request, restaurant_pk):
     menus = restaurant.menus.all()
 
     if request.method == "POST":
-        menu_choice    = request.POST.get("menu", "")
-        new_menu_name  = request.POST.get("new_menu_name", "").strip()
-        name           = request.POST.get("name", "").strip()
-        description    = request.POST.get("description", "").strip()
-        price_raw      = request.POST.get("price", "").strip()
-        display_type   = request.POST.get("display_type", Product.DisplayType.NORMAL)
-        discount_raw   = request.POST.get("discount_percent", "0").strip() or "0"
-        is_available   = request.POST.get("is_available") == "on"
-        image          = request.FILES.get("image")
+        menu_choice   = request.POST.get("menu", "")
+        new_menu_name = request.POST.get("new_menu_name", "").strip()
+        name          = request.POST.get("name", "").strip()
+        description   = request.POST.get("description", "").strip()
+        price_raw     = request.POST.get("price", "").strip()
+        display_type  = request.POST.get("display_type", Product.DisplayType.NORMAL)
+        discount_raw  = request.POST.get("discount_percent", "0").strip() or "0"
+        is_available  = request.POST.get("is_available") == "on"
+        image         = request.FILES.get("image")
 
         errors = []
         if not name:
@@ -342,13 +349,13 @@ def product_edit(request, pk):
                 messages.error(request, e)
         else:
             menu = menus.filter(pk=menu_choice).first() or product.menu
-            product.menu         = menu
-            product.name         = name
-            product.description  = description
-            product.price        = price_value
-            product.display_type = display_type
+            product.menu             = menu
+            product.name             = name
+            product.description      = description
+            product.price            = price_value
+            product.display_type     = display_type
             product.discount_percent = discount_value if display_type == Product.DisplayType.DISCOUNT else 0
-            product.is_available = is_available
+            product.is_available     = is_available
             if image:
                 product.image = image
             product.save()
@@ -619,7 +626,6 @@ def category_delete(request, pk):
 
 @admin_required
 def category_edit(request, pk):
-    """تعديل اسم الفئة — يُستدعى من الـ inline form في categories_list.html"""
     category = get_object_or_404(RestaurantCategory, pk=pk)
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
