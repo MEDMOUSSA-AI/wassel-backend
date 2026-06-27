@@ -39,26 +39,47 @@
             <input type="text" id="name" name="name"
                    value="{% if edit_mode %}{{ product.name }}{% endif %}" required>
         </div>
+
         <div class="field">
             <label for="description">الوصف</label>
             <textarea id="description" name="description" rows="3">{% if edit_mode %}{{ product.description|default:'' }}{% endif %}</textarea>
         </div>
+
         <div class="field">
             <label for="price">السعر (أ.م) *</label>
-            <!-- stringformat:"f" يحوّل 65,00 إلى 65.000000 ثم نزيل الأصفار بـ JS -->
             <input type="number" step="0.01" min="0.01" id="price" name="price"
                    value="{% if edit_mode %}{{ product.price|stringformat:'f' }}{% endif %}" required>
         </div>
+
         <div class="field">
-            <label for="image">الصورة{% if edit_mode and product.image %} (اترك فارغاً للإبقاء على الصورة الحالية){% endif %}</label>
+            <label for="image">
+                الصورة{% if edit_mode and product.image %} (اترك فارغاً للإبقاء على الصورة الحالية){% endif %}
+            </label>
+
+            {# ✅ عرض الصورة الحالية مع التحقق من نوعها #}
             {% if edit_mode and product.image %}
-            <div style="margin-bottom:8px;">
-                <img src="{{ product.image.url }}" alt="{{ product.name }}"
-                     style="max-width:120px; max-height:80px; border-radius:6px; object-fit:cover;">
-            </div>
+                {% with img_url=product.image.url %}
+                    {% if "http" in img_url %}
+                    <div style="margin-bottom:10px;">
+                        <img src="{{ img_url }}" alt="{{ product.name }}"
+                             style="max-width:120px;max-height:80px;border-radius:6px;object-fit:cover;
+                                    display:block;margin-bottom:4px;">
+                        <span style="font-size:11px;color:#27ae60;">✅ صورة Cloudinary</span>
+                    </div>
+                    {% else %}
+                    <div style="margin-bottom:10px; padding:8px 12px; background:#fff3cd;
+                                border:1px solid #ffc107; border-radius:6px;">
+                        <span style="font-size:12px;color:#856404;">
+                            ⚠️ الصورة القديمة غير متاحة على السيرفر — يرجى رفع صورة جديدة
+                        </span>
+                    </div>
+                    {% endif %}
+                {% endwith %}
             {% endif %}
+
             <input type="file" id="image" name="image" accept="image/*">
         </div>
+
         <div class="field">
             <label for="display_type">نوع العرض</label>
             <select id="display_type" name="display_type" onchange="toggleDiscountField()">
@@ -70,11 +91,13 @@
                 {% endfor %}
             </select>
         </div>
+
         <div class="field" id="discount-field" style="display:none;">
             <label for="discount_percent">نسبة الخصم (%)</label>
             <input type="number" min="0" max="100" id="discount_percent" name="discount_percent"
                    value="{% if edit_mode %}{{ product.discount_percent|default:0 }}{% else %}0{% endif %}">
         </div>
+
         <div class="field">
             <label>
                 <input type="checkbox" name="is_available"
@@ -105,18 +128,15 @@
         if (!displayType || !discountField) return;
         var isDiscount = displayType.value === 'discount';
         discountField.style.display = isDiscount ? '' : 'none';
-        // required فقط عند الظهور — هذا يحل خطأ "not focusable"
         discountInput.required = isDiscount;
     }
 
-    // تحويل السعر من 65.000000 إلى 65 عند التحميل
     var priceInput = document.getElementById('price');
     if (priceInput && priceInput.value) {
         var parsed = parseFloat(priceInput.value);
         if (!isNaN(parsed)) priceInput.value = parsed;
     }
 
-    // تشغيل عند التحميل لإظهار الحقول الصحيحة
     toggleDiscountField();
     {% if not edit_mode %}toggleNewMenuField();{% endif %}
 </script>
