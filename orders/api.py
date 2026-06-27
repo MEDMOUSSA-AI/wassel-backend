@@ -39,7 +39,7 @@ def _order_dict(order, request=None):
         "distance_km":       order.distance_km,
         "estimated_minutes": order.estimated_minutes,
         "payment_method":    order.payment_method,
-        "rating":            order.rating,  # ✅ مضاف
+        "rating":            order.rating,
         "restaurant":        {"id": order.restaurant.id, "name": order.restaurant.name} if order.restaurant else None,
         "livreur":           {"id": order.livreur.id, "full_name": order.livreur.full_name} if order.livreur else None,
         "items":             items,
@@ -54,63 +54,71 @@ def _order_dict(order, request=None):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_food_order(request):
-    if request.user.role != User.Role.CLIENT:
-        return Response({"detail": "فقط العملاء يمكنهم إنشاء طلبات."}, status=403)
+    import traceback
+    try:
+        if request.user.role != User.Role.CLIENT:
+            return Response({"detail": "فقط العملاء يمكنهم إنشاء طلبات."}, status=403)
 
-    restaurant_id     = request.data.get("restaurant_id")
-    items_data        = request.data.get("items", [])
-    dropoff_address   = request.data.get("dropoff_address", "").strip()
-    dropoff_lat       = request.data.get("dropoff_lat")
-    dropoff_lng       = request.data.get("dropoff_lng")
-    delivery_fee      = request.data.get("delivery_fee", 0)
-    distance_km       = request.data.get("distance_km")
-    estimated_minutes = request.data.get("estimated_minutes")
+        restaurant_id     = request.data.get("restaurant_id")
+        items_data        = request.data.get("items", [])
+        dropoff_address   = request.data.get("dropoff_address", "").strip()
+        dropoff_lat       = request.data.get("dropoff_lat")
+        dropoff_lng       = request.data.get("dropoff_lng")
+        delivery_fee      = request.data.get("delivery_fee", 0)
+        distance_km       = request.data.get("distance_km")
+        estimated_minutes = request.data.get("estimated_minutes")
 
-    if not restaurant_id or not items_data or not dropoff_address:
-        return Response({"detail": "restaurant_id و items و dropoff_address مطلوبة."}, status=400)
+        if not restaurant_id or not items_data or not dropoff_address:
+            return Response({"detail": "restaurant_id و items و dropoff_address مطلوبة."}, status=400)
 
-    restaurant = get_object_or_404(Restaurant, pk=restaurant_id, approval_status="approved")
+        restaurant = get_object_or_404(Restaurant, pk=restaurant_id, approval_status="approved")
 
-    items_price = 0
-    order_items = []
-    for item in items_data:
-        product    = get_object_or_404(Product, pk=item.get("product_id"))
-        qty        = int(item.get("quantity", 1))
-        unit_price = float(product.final_price)
-        items_price += unit_price * qty
-        order_items.append((product, qty, unit_price))
+        items_price = 0
+        order_items = []
+        for item in items_data:
+            product    = get_object_or_404(Product, pk=item.get("product_id"))
+            qty        = int(item.get("quantity", 1))
+            unit_price = float(product.final_price)
+            items_price += unit_price * qty
+            order_items.append((product, qty, unit_price))
 
-    total_price = items_price + float(delivery_fee)
+        total_price = items_price + float(delivery_fee)
 
-    order = Order.objects.create(
-        order_type=Order.OrderType.FOOD,
-        client=request.user,
-        restaurant=restaurant,
-        status=Order.Status.PENDING,
-        pickup_address=restaurant.address,
-        pickup_lat=restaurant.lat or 0,
-        pickup_lng=restaurant.lng or 0,
-        dropoff_address=dropoff_address,
-        dropoff_lat=dropoff_lat,
-        dropoff_lng=dropoff_lng,
-        items_price=items_price,
-        delivery_fee=delivery_fee,
-        total_price=total_price,
-        distance_km=distance_km,
-        estimated_minutes=estimated_minutes,
-    )
-
-    for product, qty, unit_price in order_items:
-        OrderItem.objects.create(
-            order=order,
-            product=product,
-            product_name=product.name,
-            unit_price=unit_price,
-            quantity=qty,
+        order = Order.objects.create(
+            order_type=Order.OrderType.FOOD,
+            client=request.user,
+            restaurant=restaurant,
+            status=Order.Status.PENDING,
+            pickup_address=restaurant.address,
+            pickup_lat=restaurant.lat or 0,
+            pickup_lng=restaurant.lng or 0,
+            dropoff_address=dropoff_address,
+            dropoff_lat=dropoff_lat,
+            dropoff_lng=dropoff_lng,
+            items_price=items_price,
+            delivery_fee=delivery_fee,
+            total_price=total_price,
+            distance_km=distance_km,
+            estimated_minutes=estimated_minutes,
         )
 
-    OrderStatusHistory.objects.create(order=order, status=Order.Status.PENDING)
-    return Response(_order_dict(order), status=201)
+        for product, qty, unit_price in order_items:
+            OrderItem.objects.create(
+                order=order,
+                product=product,
+                product_name=product.name,
+                unit_price=unit_price,
+                quantity=qty,
+            )
+
+        OrderStatusHistory.objects.create(order=order, status=Order.Status.PENDING)
+        return Response(_order_dict(order), status=201)
+
+    except Exception as e:
+        return Response({
+            "detail": str(e),
+            "trace":  traceback.format_exc(),
+        }, status=500)
 
 
 # ─────────────────────────────────────────────
@@ -243,7 +251,7 @@ def restaurant_orders(request):
 
 
 # ─────────────────────────────────────────────
-# ✅ تقييم المندوب بعد التوصيل
+# تقييم المندوب بعد التوصيل
 # POST /api/orders/<id>/rate/
 # body: { "rating": 4.5 }
 # ─────────────────────────────────────────────
