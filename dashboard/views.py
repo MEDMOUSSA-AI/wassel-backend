@@ -14,7 +14,6 @@ from .decorators import admin_required
 
 
 def sidebar_counts():
-    """أعداد العناصر بانتظار المراجعة، تُعرض كشارة في الشريط الجانبي."""
     return {
         "pending_restaurants_count": Restaurant.objects.filter(
             approval_status=Restaurant.ApprovalStatus.PENDING
@@ -127,14 +126,14 @@ def restaurant_create(request):
     categories = RestaurantCategory.objects.all()
 
     if request.method == "POST":
-        phone = request.POST.get("phone", "").strip()
-        full_name = request.POST.get("full_name", "").strip()
-        password = request.POST.get("password", "").strip()
-        name = request.POST.get("name", "").strip()
-        owner_name = request.POST.get("owner_name", "").strip()
-        category_id = request.POST.get("category") or None
-        address = request.POST.get("address", "").strip()
-        city = request.POST.get("city", "").strip()
+        phone        = request.POST.get("phone", "").strip()
+        full_name    = request.POST.get("full_name", "").strip()
+        password     = request.POST.get("password", "").strip()
+        name         = request.POST.get("name", "").strip()
+        owner_name   = request.POST.get("owner_name", "").strip()
+        category_id  = request.POST.get("category") or None
+        address      = request.POST.get("address", "").strip()
+        city         = request.POST.get("city", "").strip()
         bank_account = request.POST.get("bank_account", "").strip()
         auto_approve = request.POST.get("auto_approve") == "on"
 
@@ -161,7 +160,6 @@ def restaurant_create(request):
             owner = User(role=User.Role.RESTAURANT, phone=phone, full_name=full_name or owner_name)
             owner.set_password(password)
             owner.save()
-
             restaurant = Restaurant.objects.create(
                 owner=owner,
                 name=name,
@@ -187,21 +185,68 @@ def restaurant_create(request):
 
 
 @admin_required
+def restaurant_edit(request, pk):
+    restaurant = get_object_or_404(Restaurant, pk=pk)
+    categories = RestaurantCategory.objects.all()
+
+    if request.method == "POST":
+        restaurant.name        = request.POST.get("name", "").strip() or restaurant.name
+        restaurant.owner_name  = request.POST.get("owner_name", "").strip() or restaurant.owner_name
+        restaurant.address     = request.POST.get("address", "").strip() or restaurant.address
+        restaurant.city        = request.POST.get("city", "").strip() or restaurant.city
+        restaurant.bank_account = request.POST.get("bank_account", "").strip()
+        category_id            = request.POST.get("category") or None
+        restaurant.category_id = category_id
+        restaurant.save()
+        messages.success(request, f"تم تعديل بيانات مطعم «{restaurant.name}» بنجاح.")
+        return redirect("dashboard:restaurant_detail", pk=pk)
+
+    context = {
+        "active": "restaurants",
+        "restaurant": restaurant,
+        "categories": categories,
+        "edit_mode": True,
+        **sidebar_counts(),
+    }
+    return render(request, "dashboard/restaurant_form.html", context)
+
+
+@admin_required
+def restaurant_delete(request, pk):
+    restaurant = get_object_or_404(Restaurant, pk=pk)
+    if request.method == "POST":
+        name = restaurant.name
+        restaurant.owner.delete()  # حذف المستخدم يحذف المطعم cascade
+        messages.success(request, f"تم حذف مطعم «{name}» بنجاح.")
+        return redirect("dashboard:restaurants")
+    context = {
+        "active": "restaurants",
+        "object": restaurant,
+        "object_name": restaurant.name,
+        "cancel_url": "dashboard:restaurant_detail",
+        "cancel_pk": pk,
+        **sidebar_counts(),
+    }
+    return render(request, "dashboard/confirm_delete.html", context)
+
+
+# ===== المنتجات =====
+
+@admin_required
 def product_create(request, restaurant_pk):
     restaurant = get_object_or_404(Restaurant, pk=restaurant_pk)
     menus = restaurant.menus.all()
 
     if request.method == "POST":
-        menu_choice = request.POST.get("menu", "")
-        new_menu_name = request.POST.get("new_menu_name", "").strip()
-
-        name = request.POST.get("name", "").strip()
-        description = request.POST.get("description", "").strip()
-        price_raw = request.POST.get("price", "").strip()
-        display_type = request.POST.get("display_type", Product.DisplayType.NORMAL)
-        discount_raw = request.POST.get("discount_percent", "0").strip() or "0"
-        is_available = request.POST.get("is_available") == "on"
-        image = request.FILES.get("image")
+        menu_choice    = request.POST.get("menu", "")
+        new_menu_name  = request.POST.get("new_menu_name", "").strip()
+        name           = request.POST.get("name", "").strip()
+        description    = request.POST.get("description", "").strip()
+        price_raw      = request.POST.get("price", "").strip()
+        display_type   = request.POST.get("display_type", Product.DisplayType.NORMAL)
+        discount_raw   = request.POST.get("discount_percent", "0").strip() or "0"
+        is_available   = request.POST.get("is_available") == "on"
+        image          = request.FILES.get("image")
 
         errors = []
         if not name:
@@ -259,6 +304,89 @@ def product_create(request, restaurant_pk):
     return render(request, "dashboard/product_form.html", context)
 
 
+@admin_required
+def product_edit(request, pk):
+    product    = get_object_or_404(Product, pk=pk)
+    restaurant = product.menu.restaurant
+    menus      = restaurant.menus.all()
+
+    if request.method == "POST":
+        name         = request.POST.get("name", "").strip()
+        description  = request.POST.get("description", "").strip()
+        price_raw    = request.POST.get("price", "").strip()
+        display_type = request.POST.get("display_type", product.display_type)
+        discount_raw = request.POST.get("discount_percent", "0").strip() or "0"
+        is_available = request.POST.get("is_available") == "on"
+        image        = request.FILES.get("image")
+        menu_choice  = request.POST.get("menu", "")
+
+        errors = []
+        if not name:
+            errors.append("اسم المنتج إلزامي.")
+
+        price_value = product.price
+        try:
+            price_value = Decimal(price_raw)
+            if price_value <= 0:
+                errors.append("السعر يجب أن يكون أكبر من صفر.")
+        except (InvalidOperation, ValueError):
+            errors.append("السعر غير صالح.")
+
+        try:
+            discount_value = int(discount_raw)
+        except ValueError:
+            discount_value = 0
+
+        if errors:
+            for e in errors:
+                messages.error(request, e)
+        else:
+            menu = menus.filter(pk=menu_choice).first() or product.menu
+            product.menu         = menu
+            product.name         = name
+            product.description  = description
+            product.price        = price_value
+            product.display_type = display_type
+            product.discount_percent = discount_value if display_type == Product.DisplayType.DISCOUNT else 0
+            product.is_available = is_available
+            if image:
+                product.image = image
+            product.save()
+            messages.success(request, f"تم تعديل المنتج «{name}» بنجاح.")
+            return redirect("dashboard:restaurant_detail", pk=restaurant.pk)
+
+    context = {
+        "active": "restaurants",
+        "restaurant": restaurant,
+        "menus": menus,
+        "product": product,
+        "display_type_choices": Product.DisplayType.choices,
+        "edit_mode": True,
+        **sidebar_counts(),
+    }
+    return render(request, "dashboard/product_form.html", context)
+
+
+@admin_required
+def product_delete(request, pk):
+    product    = get_object_or_404(Product, pk=pk)
+    restaurant = product.menu.restaurant
+    if request.method == "POST":
+        name = product.name
+        product.delete()
+        messages.success(request, f"تم حذف المنتج «{name}» بنجاح.")
+        return redirect("dashboard:restaurant_detail", pk=restaurant.pk)
+    context = {
+        "active": "restaurants",
+        "object": product,
+        "object_name": product.name,
+        "cancel_url": "dashboard:restaurant_detail",
+        "cancel_pk": restaurant.pk,
+        **sidebar_counts(),
+    }
+    return render(request, "dashboard/confirm_delete.html", context)
+
+
 # ===== المناديب =====
 
 @admin_required
@@ -305,15 +433,15 @@ def livreur_detail(request, pk):
 @admin_required
 def livreur_create(request):
     if request.method == "POST":
-        phone = request.POST.get("phone", "").strip()
-        full_name = request.POST.get("full_name", "").strip()
-        password = request.POST.get("password", "").strip()
-        address = request.POST.get("address", "").strip()
-        vehicle_plate = request.POST.get("vehicle_plate", "").strip()
-        vehicle_model = request.POST.get("vehicle_model", "").strip()
-        bank_account = request.POST.get("bank_account", "").strip()
-        auto_approve = request.POST.get("auto_approve") == "on"
-        id_document = request.FILES.get("id_document")
+        phone            = request.POST.get("phone", "").strip()
+        full_name        = request.POST.get("full_name", "").strip()
+        password         = request.POST.get("password", "").strip()
+        address          = request.POST.get("address", "").strip()
+        vehicle_plate    = request.POST.get("vehicle_plate", "").strip()
+        vehicle_model    = request.POST.get("vehicle_model", "").strip()
+        bank_account     = request.POST.get("bank_account", "").strip()
+        auto_approve     = request.POST.get("auto_approve") == "on"
+        id_document      = request.FILES.get("id_document")
         license_document = request.FILES.get("license_document")
 
         errors = []
@@ -333,7 +461,6 @@ def livreur_create(request):
             user = User(role=User.Role.LIVREUR, phone=phone, full_name=full_name)
             user.set_password(password)
             user.save()
-
             livreur = LivreurProfile.objects.create(
                 user=user,
                 address=address,
@@ -357,11 +484,65 @@ def livreur_create(request):
     return render(request, "dashboard/livreur_form.html", context)
 
 
+@admin_required
+def livreur_edit(request, pk):
+    livreur = get_object_or_404(LivreurProfile, pk=pk)
+
+    if request.method == "POST":
+        livreur.user.full_name = request.POST.get("full_name", "").strip() or livreur.user.full_name
+        phone_new = request.POST.get("phone", "").strip()
+        if phone_new and phone_new != livreur.user.phone:
+            if User.objects.filter(phone=phone_new).exclude(pk=livreur.user.pk).exists():
+                messages.error(request, "رقم الهاتف هذا مستخدم بالفعل.")
+                return redirect("dashboard:livreur_edit", pk=pk)
+            livreur.user.phone = phone_new
+        livreur.user.save()
+
+        livreur.address       = request.POST.get("address", "").strip()
+        livreur.vehicle_plate = request.POST.get("vehicle_plate", "").strip()
+        livreur.vehicle_model = request.POST.get("vehicle_model", "").strip()
+        livreur.bank_account  = request.POST.get("bank_account", "").strip()
+        if request.FILES.get("id_document"):
+            livreur.id_document = request.FILES["id_document"]
+        if request.FILES.get("license_document"):
+            livreur.license_document = request.FILES["license_document"]
+        livreur.save()
+        messages.success(request, f"تم تعديل بيانات المندوب «{livreur.user.full_name}» بنجاح.")
+        return redirect("dashboard:livreur_detail", pk=pk)
+
+    context = {
+        "active": "livreurs",
+        "livreur": livreur,
+        "edit_mode": True,
+        **sidebar_counts(),
+    }
+    return render(request, "dashboard/livreur_form.html", context)
+
+
+@admin_required
+def livreur_delete(request, pk):
+    livreur = get_object_or_404(LivreurProfile, pk=pk)
+    if request.method == "POST":
+        name = livreur.user.full_name
+        livreur.user.delete()
+        messages.success(request, f"تم حذف المندوب «{name}» بنجاح.")
+        return redirect("dashboard:livreurs")
+    context = {
+        "active": "livreurs",
+        "object": livreur,
+        "object_name": livreur.user.full_name,
+        "cancel_url": "dashboard:livreur_detail",
+        "cancel_pk": pk,
+        **sidebar_counts(),
+    }
+    return render(request, "dashboard/confirm_delete.html", context)
+
+
 # ===== الطلبات =====
 
 @admin_required
 def orders_list(request):
-    status = request.GET.get("status", "all")
+    status     = request.GET.get("status", "all")
     order_type = request.GET.get("type", "all")
     qs = Order.objects.select_related("client", "restaurant", "livreur").order_by("-created_at")
     if status != "all":
