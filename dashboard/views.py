@@ -160,6 +160,7 @@ def restaurant_create(request):
             owner = User(role=User.Role.RESTAURANT, phone=phone, full_name=full_name or owner_name)
             owner.set_password(password)
             owner.save()
+
             restaurant = Restaurant.objects.create(
                 owner=owner,
                 name=name,
@@ -173,6 +174,18 @@ def restaurant_create(request):
                     else Restaurant.ApprovalStatus.PENDING
                 ),
             )
+
+            # ✅ رفع الشعار وصورة الغلاف إن وُجدا
+            changed = False
+            if request.FILES.get("logo"):
+                restaurant.logo = request.FILES["logo"]
+                changed = True
+            if request.FILES.get("cover_image"):
+                restaurant.cover_image = request.FILES["cover_image"]
+                changed = True
+            if changed:
+                restaurant.save()
+
             messages.success(request, f"تمت إضافة مطعم «{restaurant.name}» بنجاح.")
             return redirect("dashboard:restaurant_detail", pk=restaurant.pk)
 
