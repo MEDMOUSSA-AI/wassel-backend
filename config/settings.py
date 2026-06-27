@@ -2,6 +2,7 @@
 Django settings for config project.
 """
 import os
+import cloudinary
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -22,14 +23,11 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    # ✅ staticfiles أولاً — cloudinary_storage للـ media فقط
     'django.contrib.staticfiles',
     'cloudinary_storage',
     'cloudinary',
-    # third-party
     'rest_framework',
     'rest_framework.authtoken',
-    # local apps
     'accounts',
     'restaurants',
     'orders',
@@ -70,7 +68,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database
 if os.getenv("DB_ENGINE") == "postgresql":
     DATABASES = {
         'default': {
@@ -109,13 +106,20 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
-# ── Cloudinary للـ media فقط ──
+# ── Cloudinary ──
 CLOUDINARY_STORAGE = {
     'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
     'API_KEY':    os.getenv('CLOUDINARY_API_KEY'),
     'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
     'PREFIX':     'wassel',
 }
+
+# ✅ تهيئة صريحة لـ cloudinary library
+cloudinary.config(
+    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.getenv('CLOUDINARY_API_KEY'),
+    api_secret=os.getenv('CLOUDINARY_API_SECRET'),
+)
 
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 MEDIA_URL = '/media/'
