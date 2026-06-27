@@ -47,6 +47,8 @@ INSTALLED_APPS = [
 
     # third-party
     'rest_framework',
+    'cloudinary',
+    'cloudinary_storage',
 
     # local apps — wassel
     'accounts',
@@ -54,7 +56,7 @@ INSTALLED_APPS = [
     'orders',
     'delivery',
     'dashboard',
-    'favorites',   # ← أضف هذا
+    'favorites',
 ]
 
 LOGIN_URL = 'dashboard:login'
@@ -91,7 +93,6 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 # حالياً SQLite للتطوير المحلي. عند الانتقال لاحقاً إلى PostgreSQL،
 # يكفي تعريف متغيرات البيئة التالية في .env ولن نحتاج تعديل الكود:
 # DB_ENGINE=postgresql, DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
@@ -120,7 +121,6 @@ AUTH_USER_MODEL = 'accounts.User'
 
 
 # Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -139,7 +139,6 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
 
 LANGUAGE_CODE = 'ar'
 
@@ -150,16 +149,27 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static & Media files
+# Static files
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-MEDIA_URL = 'media/'
-MEDIA_ROOT = BASE_DIR / 'media'
-
 # Whitenoise — خدمة الملفات الثابتة في production
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+
+# Cloudinary — تخزين صور المنتجات ووثائق المناديب
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY':    os.getenv('CLOUDINARY_API_KEY'),
+    'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
+    'PREFIX':     'wassel',  # كل ملفات wassel في مجلد منفصل عن assas
+}
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+MEDIA_URL = '/media/'
+
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
