@@ -45,8 +45,9 @@
         </div>
         <div class="field">
             <label for="price">السعر (أ.م) *</label>
+            <!-- stringformat:"f" يحوّل 65,00 إلى 65.000000 ثم نزيل الأصفار بـ JS -->
             <input type="number" step="0.01" min="0.01" id="price" name="price"
-                   value="{% if edit_mode %}{{ product.price }}{% endif %}" required>
+                   value="{% if edit_mode %}{{ product.price|stringformat:'f' }}{% endif %}" required>
         </div>
         <div class="field">
             <label for="image">الصورة{% if edit_mode and product.image %} (اترك فارغاً للإبقاء على الصورة الحالية){% endif %}</label>
@@ -71,7 +72,7 @@
         </div>
         <div class="field" id="discount-field" style="display:none;">
             <label for="discount_percent">نسبة الخصم (%)</label>
-            <input type="number" min="1" max="100" id="discount_percent" name="discount_percent"
+            <input type="number" min="0" max="100" id="discount_percent" name="discount_percent"
                    value="{% if edit_mode %}{{ product.discount_percent|default:0 }}{% else %}0{% endif %}">
         </div>
         <div class="field">
@@ -100,8 +101,19 @@
     function toggleDiscountField() {
         var displayType = document.getElementById('display_type');
         var discountField = document.getElementById('discount-field');
+        var discountInput = document.getElementById('discount_percent');
         if (!displayType || !discountField) return;
-        discountField.style.display = (displayType.value === 'discount') ? '' : 'none';
+        var isDiscount = displayType.value === 'discount';
+        discountField.style.display = isDiscount ? '' : 'none';
+        // required فقط عند الظهور — هذا يحل خطأ "not focusable"
+        discountInput.required = isDiscount;
+    }
+
+    // تحويل السعر من 65.000000 إلى 65 عند التحميل
+    var priceInput = document.getElementById('price');
+    if (priceInput && priceInput.value) {
+        var parsed = parseFloat(priceInput.value);
+        if (!isNaN(parsed)) priceInput.value = parsed;
     }
 
     // تشغيل عند التحميل لإظهار الحقول الصحيحة
