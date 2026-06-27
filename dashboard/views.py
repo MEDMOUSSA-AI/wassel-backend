@@ -216,7 +216,7 @@ def restaurant_delete(request, pk):
     restaurant = get_object_or_404(Restaurant, pk=pk)
     if request.method == "POST":
         name = restaurant.name
-        restaurant.owner.delete()  # حذف المستخدم يحذف المطعم cascade
+        restaurant.owner.delete()
         messages.success(request, f"تم حذف مطعم «{name}» بنجاح.")
         return redirect("dashboard:restaurants")
     context = {
@@ -614,4 +614,19 @@ def category_delete(request, pk):
     if request.method == "POST":
         category.delete()
         messages.success(request, "تم حذف الفئة.")
+    return redirect("dashboard:categories")
+
+
+@admin_required
+def category_edit(request, pk):
+    """تعديل اسم الفئة — يُستدعى من الـ inline form في categories_list.html"""
+    category = get_object_or_404(RestaurantCategory, pk=pk)
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        if name:
+            category.name = name
+            category.save()
+            messages.success(request, f"تم تعديل الفئة إلى «{name}».")
+        else:
+            messages.error(request, "اسم الفئة لا يمكن أن يكون فارغاً.")
     return redirect("dashboard:categories")
