@@ -8,7 +8,6 @@
 <div class="card">
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
-
         {% if not edit_mode %}
         <div class="field">
             <label for="phone">رقم الهاتف *</label>
@@ -23,7 +22,6 @@
             <input type="password" id="password" name="password" required>
         </div>
         {% endif %}
-
         <div class="field">
             <label for="name">اسم المطعم *</label>
             <input type="text" id="name" name="name"
@@ -60,6 +58,44 @@
             <label for="bank_account">الحساب البنكي</label>
             <input type="text" id="bank_account" name="bank_account"
                    value="{% if edit_mode %}{{ restaurant.bank_account|default:'' }}{% endif %}">
+        </div>
+
+        {# ✅ شعار المطعم #}
+        <div class="field">
+            <label for="logo">شعار المطعم (Logo)</label>
+            {% if edit_mode and restaurant.logo %}
+                {% with logo_url=restaurant.logo.url %}
+                    {% if "http" in logo_url %}
+                        <div style="margin-bottom:8px;">
+                            <img src="{{ logo_url }}"
+                                 style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid #ddd;">
+                            <p style="font-size:12px;color:#888;margin:4px 0 0;">الشعار الحالي — ارفع ملفاً جديداً لاستبداله</p>
+                        </div>
+                    {% else %}
+                        <p style="font-size:12px;color:#f59e0b;margin-bottom:8px;">⚠️ الشعار الحالي قديم — يُنصح بإعادة رفعه</p>
+                    {% endif %}
+                {% endwith %}
+            {% endif %}
+            <input type="file" id="logo" name="logo" accept="image/*">
+        </div>
+
+        {# ✅ صورة الغلاف #}
+        <div class="field">
+            <label for="cover_image">صورة الغلاف (Cover)</label>
+            {% if edit_mode and restaurant.cover_image %}
+                {% with cover_url=restaurant.cover_image.url %}
+                    {% if "http" in cover_url %}
+                        <div style="margin-bottom:8px;">
+                            <img src="{{ cover_url }}"
+                                 style="width:180px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #ddd;">
+                            <p style="font-size:12px;color:#888;margin:4px 0 0;">صورة الغلاف الحالية — ارفع ملفاً جديداً لاستبدالها</p>
+                        </div>
+                    {% else %}
+                        <p style="font-size:12px;color:#f59e0b;margin-bottom:8px;">⚠️ صورة الغلاف الحالية قديمة — يُنصح بإعادة رفعها</p>
+                    {% endif %}
+                {% endwith %}
+            {% endif %}
+            <input type="file" id="cover_image" name="cover_image" accept="image/*">
         </div>
 
         {% if not edit_mode %}
