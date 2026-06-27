@@ -3,8 +3,9 @@ accounts/api.py — REST API لتسجيل الدخول وإنشاء الحساب
 """
 from django.contrib.auth import authenticate
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 
@@ -100,9 +101,11 @@ def register_client(request):
 # ─────────────────────────────────────────────
 # تسجيل مطعم جديد
 # POST /api/auth/register/restaurant/
+# ✅ parser_classes مضاف لقبول logo و cover_image
 # ─────────────────────────────────────────────
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@parser_classes([MultiPartParser, FormParser])
 def register_restaurant(request):
     required = ["full_name", "phone", "password", "restaurant_name",
                 "owner_name", "address", "city"]
@@ -152,9 +155,11 @@ def register_restaurant(request):
 # ─────────────────────────────────────────────
 # تسجيل مندوب توصيل
 # POST /api/auth/register/livreur/
+# ✅ parser_classes مضاف لقبول id_document و license_document
 # ─────────────────────────────────────────────
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@parser_classes([MultiPartParser, FormParser])
 def register_livreur(request):
     required = ["full_name", "phone", "password"]
     for field in required:
@@ -203,11 +208,13 @@ def logout_view(request):
 
 # ─────────────────────────────────────────────
 # بيانات الحساب الحالي + تعديله
-# GET  /api/auth/me/  → جلب البيانات
-# PATCH /api/auth/me/ → تعديل الاسم والعنوان والصورة
+# GET  /api/auth/me/
+# PATCH /api/auth/me/
+# ✅ parser_classes مضاف لقبول avatar عند PATCH
 # ─────────────────────────────────────────────
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def me_view(request):
     user = request.user
 
@@ -218,9 +225,9 @@ def me_view(request):
             "full_name": user.full_name,
             "phone":     user.phone,
             "role":      user.role,
-            "address":   getattr(user, "address", "") or "",
+            "address":   user.address or "",
+            "avatar":    user.avatar.url if user.avatar else "",
         }
-        # بيانات إضافية حسب الدور
         if user.role == User.Role.LIVREUR and hasattr(user, "livreur_profile"):
             lp = user.livreur_profile
             data["is_online"]       = lp.is_online
@@ -265,7 +272,6 @@ def me_view(request):
         except (TypeError, ValueError):
             return Response({"detail": "lng يجب أن يكون رقماً."}, status=400)
 
-    # رفع الصورة الشخصية (multipart)
     if "avatar" in request.FILES:
         user.avatar = request.FILES["avatar"]
         updated_fields.append("avatar")
@@ -278,5 +284,6 @@ def me_view(request):
         "full_name": user.full_name,
         "phone":     user.phone,
         "role":      user.role,
-        "address":   getattr(user, "address", "") or "",
+        "address":   user.address or "",
+        "avatar":    user.avatar.url if user.avatar else "",
     })
