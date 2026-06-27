@@ -23,13 +23,16 @@ def _image_url(image_field, request=None):
     if not image_field:
         return ""
     try:
+        # CloudinaryField يُرجع الـ URL مباشرة عبر str()
+        url = str(image_field)
+        if url.startswith("http://") or url.startswith("https://"):
+            return url
+        # محاولة .url للتوافق مع ImageField القديم
         url = image_field.url
+        if url.startswith("http://") or url.startswith("https://"):
+            return url
     except Exception:
-        return ""
-    # Cloudinary يُرجع رابطاً كاملاً يبدأ بـ http
-    if url.startswith("http://") or url.startswith("https://"):
-        return url
-    # ✅ مسار محلي قديم — أرجع "" بدل رابط مكسور يُسبب 404
+        pass
     return ""
 
 
