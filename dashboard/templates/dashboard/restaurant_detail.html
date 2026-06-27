@@ -21,6 +21,38 @@
         <div class="k">التقييم</div>      <div class="v">{{ restaurant.rating }}</div>
         <div class="k">مفتوح الآن</div>  <div class="v">{% if restaurant.is_open %}نعم{% else %}لا{% endif %}</div>
         <div class="k">تاريخ التسجيل</div><div class="v">{{ restaurant.created_at|date:"Y-m-d H:i" }}</div>
+
+        {# ✅ شعار المطعم #}
+        <div class="k">الشعار</div>
+        <div class="v">
+            {% if restaurant.logo %}
+                {% with logo_url=restaurant.logo.url %}
+                    {% if "http" in logo_url %}
+                        <img src="{{ logo_url }}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;">
+                    {% else %}
+                        <span style="color:#aaa;font-size:11px;">⚠️ صورة قديمة — أعد الرفع</span>
+                    {% endif %}
+                {% endwith %}
+            {% else %}
+                <span style="color:#aaa;">—</span>
+            {% endif %}
+        </div>
+
+        {# ✅ صورة الغلاف #}
+        <div class="k">صورة الغلاف</div>
+        <div class="v">
+            {% if restaurant.cover_image %}
+                {% with cover_url=restaurant.cover_image.url %}
+                    {% if "http" in cover_url %}
+                        <img src="{{ cover_url }}" style="width:120px;height:60px;object-fit:cover;border-radius:8px;">
+                    {% else %}
+                        <span style="color:#aaa;font-size:11px;">⚠️ صورة قديمة — أعد الرفع</span>
+                    {% endif %}
+                {% endwith %}
+            {% else %}
+                <span style="color:#aaa;">—</span>
+            {% endif %}
+        </div>
     </div>
 
     <div class="actions-row" style="margin-top:14px;">
@@ -64,11 +96,27 @@
         {% if menu.products.all %}
         <table>
             <thead>
-                <tr><th>الاسم</th><th>السعر</th><th>نوع العرض</th><th>متوفر</th><th>إجراءات</th></tr>
+                {# ✅ عمود الصورة مضاف #}
+                <tr><th>الصورة</th><th>الاسم</th><th>السعر</th><th>نوع العرض</th><th>متوفر</th><th>إجراءات</th></tr>
             </thead>
             <tbody>
                 {% for p in menu.products.all %}
                 <tr>
+                    {# ✅ عرض صورة المنتج #}
+                    <td>
+                        {% if p.image %}
+                            {% with img_url=p.image.url %}
+                                {% if "http" in img_url %}
+                                    <img src="{{ img_url }}"
+                                         style="width:48px;height:48px;object-fit:cover;border-radius:6px;">
+                                {% else %}
+                                    <span style="color:#aaa;font-size:11px;">⚠️ قديمة</span>
+                                {% endif %}
+                            {% endwith %}
+                        {% else %}
+                            <span style="color:#aaa;font-size:11px;">—</span>
+                        {% endif %}
+                    </td>
                     <td>{{ p.name }}</td>
                     <td>{{ p.final_price }} أ.م {% if p.display_type == "discount" %}<small>(خصم {{ p.discount_percent }}%)</small>{% endif %}</td>
                     <td>{{ p.get_display_type_display }}</td>
