@@ -1,0 +1,88 @@
+{% extends "dashboard/base.html" %}
+{% block title %}{% if edit_mode %}تعديل مندوب{% else %}إضافة مندوب{% endif %} — wassel{% endblock %}
+{% block content %}
+<a href="{% if edit_mode %}{% url 'dashboard:livreur_detail' livreur.pk %}{% else %}{% url 'dashboard:livreurs' %}{% endif %}" class="back-link">→ رجوع</a>
+<div class="page-header">
+    <h1>{% if edit_mode %}تعديل مندوب «{{ livreur.user.full_name }}»{% else %}إضافة مندوب جديد{% endif %}</h1>
+</div>
+<div class="card">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {% if not edit_mode %}
+        <div class="field">
+            <label for="phone">رقم الهاتف *</label>
+            <input type="text" id="phone" name="phone" required>
+        </div>
+        <div class="field">
+            <label for="password">كلمة المرور *</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        {% else %}
+        <div class="field">
+            <label for="phone">رقم الهاتف</label>
+            <input type="text" id="phone" name="phone"
+                   value="{{ livreur.user.phone }}">
+        </div>
+        {% endif %}
+
+        <div class="field">
+            <label for="full_name">الاسم الكامل *</label>
+            <input type="text" id="full_name" name="full_name"
+                   value="{% if edit_mode %}{{ livreur.user.full_name }}{% endif %}"
+                   {% if not edit_mode %}required{% endif %}>
+        </div>
+        <div class="field">
+            <label for="address">العنوان</label>
+            <input type="text" id="address" name="address"
+                   value="{% if edit_mode %}{{ livreur.address|default:'' }}{% endif %}">
+        </div>
+        <div class="field">
+            <label for="vehicle_model">موديل المركبة</label>
+            <input type="text" id="vehicle_model" name="vehicle_model"
+                   value="{% if edit_mode %}{{ livreur.vehicle_model|default:'' }}{% endif %}">
+        </div>
+        <div class="field">
+            <label for="vehicle_plate">رقم اللوحة</label>
+            <input type="text" id="vehicle_plate" name="vehicle_plate"
+                   value="{% if edit_mode %}{{ livreur.vehicle_plate|default:'' }}{% endif %}">
+        </div>
+        <div class="field">
+            <label for="bank_account">الحساب البنكي</label>
+            <input type="text" id="bank_account" name="bank_account"
+                   value="{% if edit_mode %}{{ livreur.bank_account|default:'' }}{% endif %}">
+        </div>
+        <div class="field">
+            <label for="id_document">وثيقة الهوية</label>
+            {% if edit_mode and livreur.id_document %}
+                <div style="margin-bottom:6px;">
+                    <a href="{{ livreur.id_document.url }}" target="_blank" class="btn btn-outline btn-sm">عرض الوثيقة الحالية</a>
+                </div>
+            {% endif %}
+            <input type="file" id="id_document" name="id_document" accept="image/*,.pdf">
+        </div>
+        <div class="field">
+            <label for="license_document">رخصة القيادة</label>
+            {% if edit_mode and livreur.license_document %}
+                <div style="margin-bottom:6px;">
+                    <a href="{{ livreur.license_document.url }}" target="_blank" class="btn btn-outline btn-sm">عرض الرخصة الحالية</a>
+                </div>
+            {% endif %}
+            <input type="file" id="license_document" name="license_document" accept="image/*,.pdf">
+        </div>
+
+        {% if not edit_mode %}
+        <div class="field">
+            <label>
+                <input type="checkbox" name="auto_approve" style="width:auto;display:inline-block;">
+                الموافقة الفورية على المندوب
+            </label>
+        </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary">
+            {% if edit_mode %}حفظ التعديلات{% else %}إضافة المندوب{% endif %}
+        </button>
+    </form>
+</div>
+{% endblock %}
