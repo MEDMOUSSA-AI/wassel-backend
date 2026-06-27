@@ -4,15 +4,29 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
 from django.http import JsonResponse
-import os
+import os, cloudinary, cloudinary.uploader
 
 def cloudinary_test(request):
-    return JsonResponse({
-        'cloud_name': os.getenv('CLOUDINARY_CLOUD_NAME'),
-        'api_key':    os.getenv('CLOUDINARY_API_KEY'),
-        'has_secret': bool(os.getenv('CLOUDINARY_API_SECRET')),
-        'storage':    settings.DEFAULT_FILE_STORAGE,
-    })
+    # اختبار رفع صورة بسيطة لـ Cloudinary
+    try:
+        result = cloudinary.uploader.upload(
+            "https://via.placeholder.com/100.png",
+            folder="wassel/test",
+            public_id="test_connection"
+        )
+        return JsonResponse({
+            'status': 'success',
+            'url': result.get('secure_url'),
+            'cloud_name': os.getenv('CLOUDINARY_CLOUD_NAME'),
+        })
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'error': str(e),
+            'cloud_name': os.getenv('CLOUDINARY_CLOUD_NAME'),
+            'api_key': os.getenv('CLOUDINARY_API_KEY'),
+            'has_secret': bool(os.getenv('CLOUDINARY_API_SECRET')),
+        })
 
 urlpatterns = [
     path('admin/', admin.site.urls),
