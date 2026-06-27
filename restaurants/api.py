@@ -7,11 +7,25 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from django.db.models import Count
 
 from accounts.models import User
 from orders.models import Order
 from .models import Restaurant, RestaurantCategory, Menu, Product, WorkingHours
+
+
+# ─────────────────────────────────────────────
+# دالة مساعدة: بناء رابط الصورة
+# تتعامل مع Cloudinary (رابط كامل) والملفات المحلية على حدٍّ سواء
+# ─────────────────────────────────────────────
+def _image_url(image_field, request):
+    if not image_field:
+        return None
+    url = image_field.url
+    # Cloudinary يُرجع رابطاً كاملاً يبدأ بـ http
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    # ملف محلي — نبني الرابط الكامل
+    return request.build_absolute_uri(url)
 
 
 # ─────────────────────────────────────────────
@@ -24,8 +38,7 @@ def _restaurant_list_data(r, request):
         cat = {
             "id":    r.category.id,
             "name":  r.category.name,
-            "image": request.build_absolute_uri(r.category.image.url)
-                     if r.category.image else None,
+            "image": _image_url(r.category.image, request),
         }
     rating_val = float(r.rating)
     return {
@@ -40,9 +53,8 @@ def _restaurant_list_data(r, request):
         "rating":            rating_val,
         "avg_rating":        rating_val,
         "is_open":           r.is_open,
-        "logo":              request.build_absolute_uri(r.logo.url) if r.logo else None,
-        "cover_image":       request.build_absolute_uri(r.cover_image.url)
-                             if r.cover_image else None,
+        "logo":              _image_url(r.logo, request),
+        "cover_image":       _image_url(r.cover_image, request),
         "total_orders":      total_orders,
         "likes":             0,
         "total_likes":       0,
@@ -65,7 +77,7 @@ def categories_list(request):
         {
             "id":    c.id,
             "name":  c.name,
-            "image": request.build_absolute_uri(c.image.url) if c.image else None,
+            "image": _image_url(c.image, request),
         }
         for c in categories
     ]
@@ -111,7 +123,7 @@ def restaurant_detail(request, pk):
                 "discount_percent": p.discount_percent,
                 "display_type":     p.display_type,
                 "is_available":     p.is_available,
-                "image":            request.build_absolute_uri(p.image.url) if p.image else None,
+                "image":            _image_url(p.image, request),
             }
             for p in menu.products.filter(is_available=True)
         ]
@@ -137,8 +149,7 @@ def restaurant_detail(request, pk):
         cat = {
             "id":    r.category.id,
             "name":  r.category.name,
-            "image": request.build_absolute_uri(r.category.image.url)
-                     if r.category.image else None,
+            "image": _image_url(r.category.image, request),
         }
     return Response({
         "id":                r.id,
@@ -152,9 +163,8 @@ def restaurant_detail(request, pk):
         "rating":            rating_val,
         "avg_rating":        rating_val,
         "is_open":           r.is_open,
-        "logo":              request.build_absolute_uri(r.logo.url) if r.logo else None,
-        "cover_image":       request.build_absolute_uri(r.cover_image.url)
-                             if r.cover_image else None,
+        "logo":              _image_url(r.logo, request),
+        "cover_image":       _image_url(r.cover_image, request),
         "total_orders":      total_orders,
         "likes":             0,
         "total_likes":       0,
@@ -192,9 +202,8 @@ def my_restaurant(request):
         "avg_rating":      rating_val,
         "is_open":         r.is_open,
         "approval_status": r.approval_status,
-        "logo":            request.build_absolute_uri(r.logo.url) if r.logo else None,
-        "cover_image":     request.build_absolute_uri(r.cover_image.url)
-                           if r.cover_image else None,
+        "logo":            _image_url(r.logo, request),
+        "cover_image":     _image_url(r.cover_image, request),
         "total_orders":    total_orders,
         "likes":           0,
         "total_likes":     0,
@@ -269,7 +278,7 @@ def create_product(request):
         "name":        product.name,
         "price":       float(product.price),
         "final_price": float(product.final_price),
-        "image":       request.build_absolute_uri(product.image.url) if product.image else None,
+        "image":       _image_url(product.image, request),
     }, status=201)
 
 
@@ -294,7 +303,7 @@ def update_product(request, pk):
         "id":          product.id,
         "name":        product.name,
         "final_price": float(product.final_price),
-        "image":       request.build_absolute_uri(product.image.url) if product.image else None,
+        "image":       _image_url(product.image, request),
     })
 
 
@@ -334,7 +343,7 @@ def promotions(request):
             "id":               p.id,
             "name":             p.name,
             "description":      p.description or "",
-            "image":            request.build_absolute_uri(p.image.url) if p.image else "",
+            "image":            _image_url(p.image, request) or "",
             "price":            orig_price,
             "discounted_price": round(orig_price * (1 - disc / 100), 2),
             "discount_percent": disc,
@@ -343,7 +352,7 @@ def promotions(request):
             "restaurant": {
                 "id":   r.id,
                 "name": r.name,
-                "logo": request.build_absolute_uri(r.logo.url) if r.logo else "",
+                "logo": _image_url(r.logo, request) or "",
             },
         })
 
@@ -370,7 +379,7 @@ def promotion_detail(request, pk):
         "id":               p.id,
         "name":             p.name,
         "description":      p.description or "",
-        "image":            request.build_absolute_uri(p.image.url) if p.image else "",
+        "image":            _image_url(p.image, request) or "",
         "price":            orig_price,
         "discounted_price": round(orig_price * (1 - disc / 100), 2),
         "discount_percent": disc,
@@ -379,6 +388,6 @@ def promotion_detail(request, pk):
         "restaurant": {
             "id":   r.id,
             "name": r.name,
-            "logo": request.build_absolute_uri(r.logo.url) if r.logo else "",
+            "logo": _image_url(r.logo, request) or "",
         },
     })
