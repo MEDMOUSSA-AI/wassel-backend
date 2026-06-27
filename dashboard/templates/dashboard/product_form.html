@@ -1,13 +1,10 @@
 {% extends "dashboard/base.html" %}
-{% block title %}إضافة منتج — {{ restaurant.name }} — wassel{% endblock %}
-
+{% block title %}{% if edit_mode %}تعديل منتج{% else %}إضافة منتج{% endif %} — {{ restaurant.name }} — wassel{% endblock %}
 {% block content %}
 <a href="{% url 'dashboard:restaurant_detail' pk=restaurant.pk %}" class="back-link">→ الرجوع إلى {{ restaurant.name }}</a>
-
 <div class="page-header">
-    <h1>إضافة منتج إلى «{{ restaurant.name }}»</h1>
+    <h1>{% if edit_mode %}تعديل منتج «{{ product.name }}»{% else %}إضافة منتج إلى «{{ restaurant.name }}»{% endif %}</h1>
 </div>
-
 <div class="card">
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
@@ -17,9 +14,14 @@
             {% if menus %}
             <select id="menu" name="menu" onchange="toggleNewMenuField()">
                 {% for m in menus %}
-                <option value="{{ m.id }}">{{ m.name }}{% if not m.is_active %} (غير نشطة){% endif %}</option>
+                <option value="{{ m.id }}"
+                    {% if edit_mode and product.menu_id == m.id %}selected{% endif %}>
+                    {{ m.name }}{% if not m.is_active %} (غير نشطة){% endif %}
+                </option>
                 {% endfor %}
+                {% if not edit_mode %}
                 <option value="new">+ إنشاء قائمة جديدة</option>
+                {% endif %}
             </select>
             {% else %}
             <input type="hidden" id="menu" name="menu" value="new">
@@ -27,53 +29,63 @@
             {% endif %}
         </div>
 
-        <div class="field" id="new-menu-field"{% if menus %} style="display:none;"{% endif %}>
+        <div class="field" id="new-menu-field" style="display:none;">
             <label for="new_menu_name">اسم القائمة الجديدة</label>
             <input type="text" id="new_menu_name" name="new_menu_name" placeholder="القائمة الرئيسية">
         </div>
 
         <div class="field">
             <label for="name">اسم المنتج *</label>
-            <input type="text" id="name" name="name" required>
+            <input type="text" id="name" name="name"
+                   value="{% if edit_mode %}{{ product.name }}{% endif %}" required>
         </div>
-
         <div class="field">
             <label for="description">الوصف</label>
-            <textarea id="description" name="description" rows="3"></textarea>
+            <textarea id="description" name="description" rows="3">{% if edit_mode %}{{ product.description|default:'' }}{% endif %}</textarea>
         </div>
-
         <div class="field">
             <label for="price">السعر (أ.م) *</label>
-            <input type="number" step="0.01" min="0.01" id="price" name="price" required>
+            <input type="number" step="0.01" min="0.01" id="price" name="price"
+                   value="{% if edit_mode %}{{ product.price }}{% endif %}" required>
         </div>
-
         <div class="field">
-            <label for="image">الصورة</label>
+            <label for="image">الصورة{% if edit_mode and product.image %} (اترك فارغاً للإبقاء على الصورة الحالية){% endif %}</label>
+            {% if edit_mode and product.image %}
+            <div style="margin-bottom:8px;">
+                <img src="{{ product.image.url }}" alt="{{ product.name }}"
+                     style="max-width:120px; max-height:80px; border-radius:6px; object-fit:cover;">
+            </div>
+            {% endif %}
             <input type="file" id="image" name="image" accept="image/*">
         </div>
-
         <div class="field">
             <label for="display_type">نوع العرض</label>
             <select id="display_type" name="display_type" onchange="toggleDiscountField()">
                 {% for value, label in display_type_choices %}
-                <option value="{{ value }}">{{ label }}</option>
+                <option value="{{ value }}"
+                    {% if edit_mode and product.display_type == value %}selected{% endif %}>
+                    {{ label }}
+                </option>
                 {% endfor %}
             </select>
         </div>
-
         <div class="field" id="discount-field" style="display:none;">
             <label for="discount_percent">نسبة الخصم (%)</label>
-            <input type="number" min="1" max="100" id="discount_percent" name="discount_percent" value="0">
+            <input type="number" min="1" max="100" id="discount_percent" name="discount_percent"
+                   value="{% if edit_mode %}{{ product.discount_percent|default:0 }}{% else %}0{% endif %}">
         </div>
-
         <div class="field">
             <label>
-                <input type="checkbox" name="is_available" checked style="width:auto; display:inline-block;">
+                <input type="checkbox" name="is_available"
+                       {% if not edit_mode or product.is_available %}checked{% endif %}
+                       style="width:auto; display:inline-block;">
                 متوفر حالياً
             </label>
         </div>
 
-        <button type="submit" class="btn btn-primary">إضافة المنتج</button>
+        <button type="submit" class="btn btn-primary">
+            {% if edit_mode %}حفظ التعديلات{% else %}إضافة المنتج{% endif %}
+        </button>
     </form>
 </div>
 
@@ -84,12 +96,16 @@
         if (!menuSelect || !newMenuField) return;
         newMenuField.style.display = (menuSelect.value === 'new') ? '' : 'none';
     }
+
     function toggleDiscountField() {
         var displayType = document.getElementById('display_type');
         var discountField = document.getElementById('discount-field');
         if (!displayType || !discountField) return;
         discountField.style.display = (displayType.value === 'discount') ? '' : 'none';
     }
+
+    // تشغيل عند التحميل لإظهار الحقول الصحيحة
     toggleDiscountField();
+    {% if not edit_mode %}toggleNewMenuField();{% endif %}
 </script>
 {% endblock %}
