@@ -1,55 +1,104 @@
 {% extends "dashboard/base.html" %}
 {% block title %}{{ livreur.user.full_name }} — wassel{% endblock %}
-
 {% block content %}
 <a href="{% url 'dashboard:livreurs' %}" class="back-link">→ الرجوع لقائمة المناديب</a>
-
 <div class="page-header">
     <h1>{{ livreur.user.full_name|default:livreur.user.username }}</h1>
     <span class="status-pill status-{{ livreur.approval_status }}">{{ livreur.get_approval_status_display }}</span>
 </div>
-
 <div class="card">
     <h2>بيانات المندوب</h2>
-    <div class="detail-grid">
-        <div class="k">رقم الهاتف</div><div class="v">{{ livreur.user.phone }}</div>
-        <div class="k">العنوان</div><div class="v">{{ livreur.address|default:"—" }}</div>
-        <div class="k">موديل المركبة</div><div class="v">{{ livreur.vehicle_model|default:"—" }}</div>
-        <div class="k">رقم اللوحة</div><div class="v">{{ livreur.vehicle_plate|default:"—" }}</div>
-        <div class="k">الحساب البنكي</div><div class="v">{{ livreur.bank_account|default:"—" }}</div>
-        <div class="k">الرصيد الحالي</div><div class="v">{{ livreur.balance }} أ.م</div>
-        <div class="k">نسبة العمولة</div><div class="v">{{ livreur.commission_rate }}</div>
-        <div class="k">متاح الآن</div><div class="v">{% if livreur.is_online %}نعم{% else %}لا{% endif %}</div>
-        <div class="k">تاريخ التسجيل</div><div class="v">{{ livreur.created_at|date:"Y-m-d H:i" }}</div>
+
+    <!-- ===== وضع العرض ===== -->
+    <div id="livreur-view">
+        <div class="detail-grid">
+            <div class="k">رقم الهاتف</div>     <div class="v">{{ livreur.user.phone }}</div>
+            <div class="k">العنوان</div>          <div class="v">{{ livreur.address|default:"—" }}</div>
+            <div class="k">موديل المركبة</div>   <div class="v">{{ livreur.vehicle_model|default:"—" }}</div>
+            <div class="k">رقم اللوحة</div>      <div class="v">{{ livreur.vehicle_plate|default:"—" }}</div>
+            <div class="k">الحساب البنكي</div>   <div class="v">{{ livreur.bank_account|default:"—" }}</div>
+            <div class="k">الرصيد الحالي</div>   <div class="v">{{ livreur.balance }} أ.م</div>
+            <div class="k">نسبة العمولة</div>    <div class="v">{{ livreur.commission_rate }}</div>
+            <div class="k">متاح الآن</div>       <div class="v">{% if livreur.is_online %}نعم{% else %}لا{% endif %}</div>
+            <div class="k">تاريخ التسجيل</div>  <div class="v">{{ livreur.created_at|date:"Y-m-d H:i" }}</div>
+        </div>
+        <div class="actions-row" style="margin-top:14px;">
+            <button type="button" class="btn btn-outline" onclick="startEdit()">✏️ تعديل البيانات</button>
+            {% if livreur.id_document %}<a href="{{ livreur.id_document.url }}" target="_blank" class="btn btn-outline btn-sm">عرض وثيقة الهوية</a>{% endif %}
+            {% if livreur.license_document %}<a href="{{ livreur.license_document.url }}" target="_blank" class="btn btn-outline btn-sm">عرض رخصة القيادة</a>{% endif %}
+        </div>
     </div>
 
-    <div class="actions-row" style="margin-top:14px;">
-        {% if livreur.id_document %}<a href="{{ livreur.id_document.url }}" target="_blank" class="btn btn-outline btn-sm">عرض وثيقة الهوية</a>{% endif %}
-        {% if livreur.license_document %}<a href="{{ livreur.license_document.url }}" target="_blank" class="btn btn-outline btn-sm">عرض رخصة القيادة</a>{% endif %}
+    <!-- ===== وضع التعديل (مخفي في البداية) ===== -->
+    <div id="livreur-edit" style="display:none;">
+        <form method="post" action="{% url 'dashboard:livreur_edit' livreur.pk %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="detail-grid" style="align-items:center;">
+                <div class="k"><label for="edit-phone">رقم الهاتف</label></div>
+                <div class="v"><input type="text" id="edit-phone" name="phone" class="edit-input"></div>
+
+                <div class="k"><label for="edit-address">العنوان</label></div>
+                <div class="v"><input type="text" id="edit-address" name="address" class="edit-input"></div>
+
+                <div class="k"><label for="edit-vehicle-model">موديل المركبة</label></div>
+                <div class="v"><input type="text" id="edit-vehicle-model" name="vehicle_model" class="edit-input"></div>
+
+                <div class="k"><label for="edit-vehicle-plate">رقم اللوحة</label></div>
+                <div class="v"><input type="text" id="edit-vehicle-plate" name="vehicle_plate" class="edit-input"></div>
+
+                <div class="k"><label for="edit-bank-account">الحساب البنكي</label></div>
+                <div class="v"><input type="text" id="edit-bank-account" name="bank_account" class="edit-input"></div>
+
+                <div class="k"><label for="edit-full-name">الاسم الكامل</label></div>
+                <div class="v"><input type="text" id="edit-full-name" name="full_name" class="edit-input"></div>
+            </div>
+
+            <div class="field" style="margin-top:12px;">
+                <label for="edit-id-doc">وثيقة الهوية (اترك فارغاً للإبقاء على الحالية)</label>
+                {% if livreur.id_document %}
+                <div style="margin-bottom:6px;">
+                    <a href="{{ livreur.id_document.url }}" target="_blank" class="btn btn-outline btn-sm">عرض الوثيقة الحالية</a>
+                </div>
+                {% endif %}
+                <input type="file" id="edit-id-doc" name="id_document" accept="image/*,.pdf">
+            </div>
+
+            <div class="field">
+                <label for="edit-license-doc">رخصة القيادة (اترك فارغاً للإبقاء على الحالية)</label>
+                {% if livreur.license_document %}
+                <div style="margin-bottom:6px;">
+                    <a href="{{ livreur.license_document.url }}" target="_blank" class="btn btn-outline btn-sm">عرض الرخصة الحالية</a>
+                </div>
+                {% endif %}
+                <input type="file" id="edit-license-doc" name="license_document" accept="image/*,.pdf">
+            </div>
+
+            <div class="actions-row" style="margin-top:14px;">
+                <button type="submit" class="btn btn-primary">💾 حفظ التعديلات</button>
+                <button type="button" class="btn btn-secondary" onclick="cancelEdit()">إلغاء</button>
+            </div>
+        </form>
     </div>
 
+    <!-- ===== أزرار الموافقة / الرفض ===== -->
     {% if livreur.approval_status == "pending" %}
     <div class="actions-row">
-        <form method="post">
-            {% csrf_token %}
+        <form method="post">{% csrf_token %}
             <button type="submit" name="action" value="approve" class="btn btn-success">✓ الموافقة على المندوب</button>
         </form>
-        <form method="post">
-            {% csrf_token %}
+        <form method="post">{% csrf_token %}
             <button type="submit" name="action" value="reject" class="btn btn-danger">✗ رفض المندوب</button>
         </form>
     </div>
     {% elif livreur.approval_status == "approved" %}
     <div class="actions-row">
-        <form method="post">
-            {% csrf_token %}
+        <form method="post">{% csrf_token %}
             <button type="submit" name="action" value="reject" class="btn btn-danger">✗ رفض المندوب</button>
         </form>
     </div>
     {% else %}
     <div class="actions-row">
-        <form method="post">
-            {% csrf_token %}
+        <form method="post">{% csrf_token %}
             <button type="submit" name="action" value="approve" class="btn btn-success">✓ الموافقة على المندوب</button>
         </form>
     </div>
@@ -79,4 +128,47 @@
     <div class="empty-state">لا توجد توصيلات بعد.</div>
     {% endif %}
 </div>
+
+<style>
+.edit-input {
+    width: 100%;
+    padding: 5px 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+}
+</style>
+
+<script>
+// القيم الحالية للمندوب — تُملأ مرة واحدة عند تحميل الصفحة
+var livreurData = {
+    phone:         "{{ livreur.user.phone|escapejs }}",
+    address:       "{{ livreur.address|default:''|escapejs }}",
+    vehicle_model: "{{ livreur.vehicle_model|default:''|escapejs }}",
+    vehicle_plate: "{{ livreur.vehicle_plate|default:''|escapejs }}",
+    bank_account:  "{{ livreur.bank_account|default:''|escapejs }}",
+    full_name:     "{{ livreur.user.full_name|default:livreur.user.username|escapejs }}"
+};
+
+function startEdit() {
+    // ① ملء جميع الحقول بالقيم الحالية أولاً
+    document.getElementById('edit-phone').value         = livreurData.phone;
+    document.getElementById('edit-address').value       = livreurData.address;
+    document.getElementById('edit-vehicle-model').value = livreurData.vehicle_model;
+    document.getElementById('edit-vehicle-plate').value = livreurData.vehicle_plate;
+    document.getElementById('edit-bank-account').value  = livreurData.bank_account;
+    document.getElementById('edit-full-name').value     = livreurData.full_name;
+
+    // ② إظهار وضع التعديل وإخفاء وضع العرض
+    document.getElementById('livreur-view').style.display = 'none';
+    document.getElementById('livreur-edit').style.display = '';
+}
+
+function cancelEdit() {
+    // إعادة وضع العرض بدون أي تغيير
+    document.getElementById('livreur-edit').style.display = 'none';
+    document.getElementById('livreur-view').style.display = '';
+}
+</script>
 {% endblock %}
