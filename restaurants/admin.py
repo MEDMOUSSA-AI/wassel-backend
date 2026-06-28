@@ -1,6 +1,5 @@
 from django.contrib import admin
-
-from .models import RestaurantCategory, Restaurant, WorkingHours, Menu, Product
+from .models import RestaurantCategory, Restaurant, WorkingHours, Menu, Product, Favorite
 
 
 @admin.register(RestaurantCategory)
@@ -43,3 +42,10 @@ class ProductAdmin(admin.ModelAdmin):
     list_display = ("name", "menu", "price", "display_type", "discount_percent", "is_available")
     list_filter = ("display_type", "is_available")
     search_fields = ("name", "menu__restaurant__name")
+
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    list_display = ("client", "product", "created_at")
+    list_filter = ("created_at",)
+    search_fields = ("client__phone", "product__name")
