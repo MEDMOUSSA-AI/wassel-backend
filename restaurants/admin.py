@@ -1,10 +1,10 @@
 from django.contrib import admin
-from .models import RestaurantCategory, Restaurant, WorkingHours, Menu, Product, Favorite
+from .models import RestaurantCategory, Restaurant, WorkingHours, Menu, Product, Promotion
 
 
 @admin.register(RestaurantCategory)
 class RestaurantCategoryAdmin(admin.ModelAdmin):
-    list_display = ("name",)
+    list_display  = ("name",)
     search_fields = ("name",)
 
 
@@ -15,11 +15,11 @@ class WorkingHoursInline(admin.TabularInline):
 
 @admin.register(Restaurant)
 class RestaurantAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner_name", "city", "category", "approval_status", "is_open", "rating")
-    list_filter = ("approval_status", "is_open", "city", "category")
+    list_display  = ("name", "owner_name", "city", "category", "approval_status", "is_open", "rating")
+    list_filter   = ("approval_status", "is_open", "city", "category")
     search_fields = ("name", "owner_name", "owner__phone")
-    inlines = [WorkingHoursInline]
-    actions = ["approve_restaurants", "reject_restaurants"]
+    inlines       = [WorkingHoursInline]
+    actions       = ["approve_restaurants", "reject_restaurants"]
 
     @admin.action(description="الموافقة على المطاعم المختارة")
     def approve_restaurants(self, request, queryset):
@@ -32,20 +32,20 @@ class RestaurantAdmin(admin.ModelAdmin):
 
 @admin.register(Menu)
 class MenuAdmin(admin.ModelAdmin):
-    list_display = ("name", "restaurant", "is_active")
-    list_filter = ("is_active",)
+    list_display  = ("name", "restaurant", "is_active")
+    list_filter   = ("is_active",)
     search_fields = ("name", "restaurant__name")
 
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("name", "menu", "price", "display_type", "discount_percent", "is_available")
-    list_filter = ("display_type", "is_available")
+    list_display  = ("name", "menu", "price", "display_type", "discount_percent", "is_available")
+    list_filter   = ("display_type", "is_available")
     search_fields = ("name", "menu__restaurant__name")
 
 
-@admin.register(Favorite)
-class FavoriteAdmin(admin.ModelAdmin):
-    list_display = ("client", "product", "created_at")
-    list_filter = ("created_at",)
-    search_fields = ("client__phone", "product__name")
+@admin.register(Promotion)
+class PromotionAdmin(admin.ModelAdmin):
+    list_display  = ("title", "restaurant", "discount_percent", "is_active", "start_date", "end_date")
+    list_filter   = ("is_active",)
+    search_fields = ("title", "restaurant__name")
