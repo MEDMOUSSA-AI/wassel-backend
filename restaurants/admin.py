@@ -4,8 +4,9 @@ from .models import RestaurantCategory, Restaurant, WorkingHours, Menu, Product,
 
 @admin.register(RestaurantCategory)
 class RestaurantCategoryAdmin(admin.ModelAdmin):
-    list_display  = ("name",)
+    list_display  = ("name", "image")
     search_fields = ("name",)
+    fields        = ("name", "image")
 
 
 class WorkingHoursInline(admin.TabularInline):
