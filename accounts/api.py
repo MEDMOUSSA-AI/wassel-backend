@@ -101,7 +101,6 @@ def register_client(request):
 # ─────────────────────────────────────────────
 # تسجيل مطعم جديد
 # POST /api/auth/register/restaurant/
-# ✅ parser_classes مضاف لقبول logo و cover_image
 # ─────────────────────────────────────────────
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -155,7 +154,6 @@ def register_restaurant(request):
 # ─────────────────────────────────────────────
 # تسجيل مندوب توصيل
 # POST /api/auth/register/livreur/
-# ✅ parser_classes مضاف لقبول id_document و license_document
 # ─────────────────────────────────────────────
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -207,10 +205,51 @@ def logout_view(request):
 
 
 # ─────────────────────────────────────────────
+# تغيير كلمة المرور
+# POST /api/auth/change-password/
+# ─────────────────────────────────────────────
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def change_password_view(request):
+    old_password = request.data.get("old_password", "").strip()
+    new_password = request.data.get("new_password", "").strip()
+
+    if not old_password or not new_password:
+        return Response(
+            {"detail": "كلمة المرور الحالية والجديدة مطلوبتان."},
+            status=400,
+        )
+
+    if len(new_password) < 6:
+        return Response(
+            {"detail": "كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل."},
+            status=400,
+        )
+
+    user = request.user
+    if not user.check_password(old_password):
+        return Response(
+            {"detail": "كلمة المرور الحالية غير صحيحة."},
+            status=400,
+        )
+
+    user.set_password(new_password)
+    user.save(update_fields=["password"])
+
+    # تجديد التوكن حتى لا تنتهي صلاحية الجلسة القديمة
+    Token.objects.filter(user=user).delete()
+    new_token = Token.objects.create(user=user)
+
+    return Response({
+        "detail": "تم تغيير كلمة المرور بنجاح.",
+        "token":  new_token.key,   # أرسل التوكن الجديد للـ Flutter ليحفظه
+    })
+
+
+# ─────────────────────────────────────────────
 # بيانات الحساب الحالي + تعديله
 # GET  /api/auth/me/
 # PATCH /api/auth/me/
-# ✅ parser_classes مضاف لقبول avatar عند PATCH
 # ─────────────────────────────────────────────
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
