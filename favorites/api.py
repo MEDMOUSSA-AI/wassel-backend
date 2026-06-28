@@ -2,14 +2,18 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+
 from .models import Favorite
+from restaurants.models import Product
 
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def favorites_list(request):
     if request.method == "GET":
-        favs = Favorite.objects.filter(user=request.user).select_related("product")
+        favs = Favorite.objects.filter(user=request.user).select_related(
+            "product__menu__restaurant"
+        )
         return Response([_fav_dict(f) for f in favs])
 
     # POST — إضافة للمفضلة
@@ -17,9 +21,7 @@ def favorites_list(request):
     if not menu_item_id:
         return Response({"detail": "menu_item_id مطلوب."}, status=400)
 
-    from restaurants.models import Product
     product = get_object_or_404(Product, pk=menu_item_id)
-
     fav, created = Favorite.objects.get_or_create(
         user=request.user, product=product
     )
@@ -37,11 +39,11 @@ def favorites_detail(request, pk):
 def _fav_dict(fav):
     p = fav.product
     return {
-        "id":          fav.id,
-        "menu_item_id": p.id,
-        "name":        p.name,
-        "description": p.description or "",
-        "image":       p.image.url if p.image else "",
-        "price":       float(p.final_price),
+        "id":              fav.id,
+        "menu_item_id":    p.id,
+        "name":            p.name,
+        "description":     p.description or "",
+        "image":           p.image.url if p.image else "",
+        "price":           float(p.final_price),
         "restaurant_name": p.menu.restaurant.name if p.menu else "",
     }
