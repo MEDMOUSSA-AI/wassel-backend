@@ -53,7 +53,6 @@ class Restaurant(models.Model):
     rating    = models.DecimalField(max_digits=3, decimal_places=1, default=0)
     is_open   = models.BooleanField(default=True)
 
-    # ── رسوم التوصيل والوقت التقديري ──
     delivery_fee      = models.DecimalField(
         max_digits=8, decimal_places=2, default=0,
         verbose_name="رسوم التوصيل"
@@ -70,7 +69,6 @@ class Restaurant(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # ── خصائص محسوبة ──
     @property
     def is_visible_to_clients(self):
         return (
@@ -80,7 +78,6 @@ class Restaurant(models.Model):
 
     @property
     def total_orders(self):
-        """عدد الطلبات الكلي — محسوب من جدول الطلبات مباشرةً."""
         return self.orders.count()
 
     class Meta:
@@ -163,7 +160,6 @@ class Product(models.Model):
     discount_percent = models.PositiveIntegerField(default=0)
     is_available     = models.BooleanField(default=True)
 
-    # ── تقييم المنتج (يُحدَّث تلقائياً عند تقييم الطلب) ──
     rating     = models.DecimalField(
         max_digits=3, decimal_places=1, default=0,
         verbose_name="تقييم المنتج"
@@ -194,7 +190,6 @@ class Promotion(models.Model):
     description = models.TextField(blank=True,     verbose_name="وصف العرض")
     image       = CloudinaryField("promotion_images", null=True, blank=True)
 
-    # ربط اختياري بمطعم معين
     restaurant  = models.ForeignKey(
         Restaurant,
         on_delete=models.CASCADE,
@@ -203,7 +198,6 @@ class Promotion(models.Model):
         verbose_name="المطعم",
     )
 
-    # نسبة خصم اختيارية تُعرض في الواجهة
     discount_percent = models.PositiveIntegerField(
         default=0, verbose_name="نسبة الخصم %"
     )
@@ -221,34 +215,4 @@ class Promotion(models.Model):
     def __str__(self):
         return self.title
 
-
-# ══════════════════════════════════════════
-#  المفضلة  (ApiService.getFavorites …)
-# ══════════════════════════════════════════
-class Favorite(models.Model):
-    """
-    يحفظ المنتجات المفضلة لكل عميل.
-    الواجهة ترسل: product_id
-    """
-    client  = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name="favorites",
-        verbose_name="العميل",
-    )
-    product = models.ForeignKey(
-        Product,
-        on_delete=models.CASCADE,
-        related_name="favorited_by",
-        verbose_name="المنتج",
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together     = ("client", "product")   # لا يتكرر نفس المنتج
-        ordering            = ["-created_at"]
-        verbose_name        = "مفضلة"
-        verbose_name_plural = "المفضلات"
-
-    def __str__(self):
-        return f"{self.client} ← {self.product.name}"
+# ✅ تم حذف Favorite من هنا — انتقل إلى favorites/models.py
