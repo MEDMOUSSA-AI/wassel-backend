@@ -12,22 +12,13 @@ from orders.models import Order
 from .models import Restaurant, RestaurantCategory, Menu, Product, WorkingHours
 
 
-# ─────────────────────────────────────────────
-# دالة مساعدة: بناء رابط الصورة
-# ✅ تتعامل مع 3 حالات:
-#    1. Cloudinary URL كامل → يُرجع مباشرة
-#    2. مسار محلي قديم     → يُرجع "" بدل 404
-#    3. حقل فارغ           → يُرجع ""
-# ─────────────────────────────────────────────
 def _image_url(image_field, request=None):
     if not image_field:
         return ""
     try:
-        # CloudinaryField يُرجع الـ URL مباشرة عبر str()
         url = str(image_field)
         if url.startswith("http://") or url.startswith("https://"):
             return url
-        # محاولة .url للتوافق مع ImageField القديم
         url = image_field.url
         if url.startswith("http://") or url.startswith("https://"):
             return url
@@ -36,9 +27,6 @@ def _image_url(image_field, request=None):
     return ""
 
 
-# ─────────────────────────────────────────────
-# دالة مساعدة: بناء بيانات المطعم للقوائم
-# ─────────────────────────────────────────────
 def _restaurant_list_data(r, request):
     total_orders = Order.objects.filter(restaurant=r, status="delivered").count()
     cat = None
@@ -66,17 +54,13 @@ def _restaurant_list_data(r, request):
         "total_orders":      total_orders,
         "likes":             0,
         "total_likes":       0,
-        "delivery_fee":      50,
-        "estimated_minutes": 30,
+        "delivery_fee":      float(r.delivery_fee),
+        "estimated_minutes": r.estimated_minutes,
         "category":          cat,
         "category_id":       r.category_id,
     }
 
 
-# ─────────────────────────────────────────────
-# تصنيفات المطاعم
-# GET /api/restaurants/categories/
-# ─────────────────────────────────────────────
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def categories_list(request):
@@ -92,11 +76,6 @@ def categories_list(request):
     return Response(data)
 
 
-# ─────────────────────────────────────────────
-# قائمة المطاعم
-# GET /api/restaurants/
-# GET /api/restaurants/?category_id=<id>
-# ─────────────────────────────────────────────
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def restaurants_list(request):
@@ -108,10 +87,6 @@ def restaurants_list(request):
     return Response(data)
 
 
-# ─────────────────────────────────────────────
-# تفاصيل مطعم واحد مع قوائمه ومنتجاته
-# GET /api/restaurants/<id>/
-# ─────────────────────────────────────────────
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def restaurant_detail(request, pk):
@@ -132,6 +107,7 @@ def restaurant_detail(request, pk):
                 "display_type":     p.display_type,
                 "is_available":     p.is_available,
                 "image":            _image_url(p.image, request),
+                "rating":           float(p.rating),
             }
             for p in menu.products.filter(is_available=True)
         ]
@@ -179,8 +155,8 @@ def restaurant_detail(request, pk):
         "total_orders":      total_orders,
         "likes":             0,
         "total_likes":       0,
-        "delivery_fee":      50,
-        "estimated_minutes": 30,
+        "delivery_fee":      float(r.delivery_fee),
+        "estimated_minutes": r.estimated_minutes,
         "category":          cat,
         "category_id":       r.category_id,
         "menus":             menus,
@@ -188,10 +164,7 @@ def restaurant_detail(request, pk):
     })
 
 
-# ─────────────────────────────────────────────
-# بيانات المطعم الخاص بالمالك
-# GET /api/restaurants/mine/
-# ─────────────────────────────────────────────
+# ✅ الدالة المعدلة — أضفنا القوائم والمنتجات
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def my_restaurant(request):
@@ -200,6 +173,33 @@ def my_restaurant(request):
     r = get_object_or_404(Restaurant, owner=request.user)
     total_orders = Order.objects.filter(restaurant=r, status="delivered").count()
     rating_val   = float(r.rating)
+
+    # ── القوائم والمنتجات (المالك يرى كل منتجاته بدون فلتر) ──
+    menus = []
+    for menu in r.menus.filter(is_active=True):
+        products = [
+            {
+                "id":               p.id,
+                "name":             p.name,
+                "description":      p.description,
+                "price":            float(p.price),
+                "final_price":      float(p.final_price),
+                "discount_percent": p.discount_percent,
+                "display_type":     p.display_type,
+                "is_available":     p.is_available,
+                "image":            _image_url(p.image, request),
+                "rating":           float(p.rating),
+            }
+            for p in menu.products.all()
+        ]
+        menus.append({
+            "id":         menu.id,
+            "name":       menu.name,
+            "time_label": menu.time_label,
+            "is_active":  menu.is_active,
+            "products":   products,
+        })
+
     return Response({
         "id":                r.id,
         "name":              r.name,
@@ -218,15 +218,12 @@ def my_restaurant(request):
         "total_orders":      total_orders,
         "likes":             0,
         "total_likes":       0,
-        "delivery_fee":      50,
-        "estimated_minutes": 30,
+        "delivery_fee":      float(r.delivery_fee),
+        "estimated_minutes": r.estimated_minutes,
+        "menus":             menus,
     })
 
 
-# ─────────────────────────────────────────────
-# تحديث حالة المطعم (مفتوح/مغلق)
-# PATCH /api/restaurants/mine/toggle-open/
-# ─────────────────────────────────────────────
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def toggle_restaurant_open(request):
@@ -238,11 +235,6 @@ def toggle_restaurant_open(request):
     return Response({"is_open": r.is_open})
 
 
-# ─────────────────────────────────────────────
-# رفع لوجو المطعم وصورة الغلاف
-# PATCH /api/restaurants/mine/images/
-# form-data: logo (file, اختياري), cover_image (file, اختياري)
-# ─────────────────────────────────────────────
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
@@ -251,7 +243,6 @@ def update_restaurant_images(request):
         return Response({"detail": "غير مصرح."}, status=403)
 
     r = get_object_or_404(Restaurant, owner=request.user)
-
     updated = []
 
     if "logo" in request.FILES:
@@ -277,10 +268,6 @@ def update_restaurant_images(request):
     })
 
 
-# ─────────────────────────────────────────────
-# إنشاء قائمة جديدة
-# POST /api/restaurants/menus/
-# ─────────────────────────────────────────────
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_menu(request):
@@ -298,10 +285,6 @@ def create_menu(request):
     return Response({"id": menu.id, "name": menu.name}, status=201)
 
 
-# ─────────────────────────────────────────────
-# تعديل قائمة
-# PATCH /api/restaurants/menus/<id>/
-# ─────────────────────────────────────────────
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def update_menu(request, pk):
@@ -323,10 +306,6 @@ def update_menu(request, pk):
     return Response({"id": menu.id, "name": menu.name, "time_label": menu.time_label})
 
 
-# ─────────────────────────────────────────────
-# حذف قائمة
-# DELETE /api/restaurants/menus/<id>/
-# ─────────────────────────────────────────────
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 def delete_menu(request, pk):
@@ -337,10 +316,6 @@ def delete_menu(request, pk):
     return Response(status=204)
 
 
-# ─────────────────────────────────────────────
-# إضافة منتج لقائمة
-# POST /api/restaurants/products/
-# ─────────────────────────────────────────────
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
@@ -371,10 +346,6 @@ def create_product(request):
     }, status=201)
 
 
-# ─────────────────────────────────────────────
-# تعديل منتج
-# PATCH /api/restaurants/products/<id>/
-# ─────────────────────────────────────────────
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
@@ -396,10 +367,6 @@ def update_product(request, pk):
     })
 
 
-# ─────────────────────────────────────────────
-# حذف منتج
-# DELETE /api/restaurants/products/<id>/delete/
-# ─────────────────────────────────────────────
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 def delete_product(request, pk):
@@ -410,10 +377,6 @@ def delete_product(request, pk):
     return Response(status=204)
 
 
-# ─────────────────────────────────────────────
-# قائمة العروض الترويجية
-# GET /api/promotions/
-# ─────────────────────────────────────────────
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def promotions(request):
@@ -448,10 +411,6 @@ def promotions(request):
     return Response(data)
 
 
-# ─────────────────────────────────────────────
-# تفاصيل منتج/عرض ترويجي
-# GET /api/promotions/<pk>/
-# ─────────────────────────────────────────────
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def promotion_detail(request, pk):
@@ -482,11 +441,6 @@ def promotion_detail(request, pk):
     })
 
 
-# ─────────────────────────────────────────────
-# ⚠️  endpoint مؤقت — يمسح مسارات الصور المكسورة (المحلية)
-# GET /api/restaurants/clear-broken-images/
-# احذفه بعد الانتهاء
-# ─────────────────────────────────────────────
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def clear_broken_images(request):
@@ -500,18 +454,12 @@ def clear_broken_images(request):
     return Response({"cleared": len(cleared), "details": cleared})
 
 
-# ─────────────────────────────────────────────
-# ⚠️  endpoint مؤقت لاختبار Cloudinary وترحيل الصور
-# GET /api/restaurants/migrate-images/
-# احذفه بعد التأكد من عمل كل شيء
-# ─────────────────────────────────────────────
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def migrate_images(request):
     import cloudinary.uploader
     import os
 
-    # ── اختبار المتغيرات ──
     cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME')
     api_key    = os.getenv('CLOUDINARY_API_KEY')
     api_secret = os.getenv('CLOUDINARY_API_SECRET')
