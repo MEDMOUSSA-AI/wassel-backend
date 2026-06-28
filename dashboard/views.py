@@ -175,7 +175,6 @@ def restaurant_create(request):
                 ),
             )
 
-            # ✅ رفع الشعار وصورة الغلاف إن وُجدا
             changed = False
             if request.FILES.get("logo"):
                 restaurant.logo = request.FILES["logo"]
@@ -211,7 +210,6 @@ def restaurant_edit(request, pk):
         category_id             = request.POST.get("category") or None
         restaurant.category_id  = category_id
 
-        # ✅ رفع الشعار وصورة الغلاف على Cloudinary
         if request.FILES.get("logo"):
             restaurant.logo = request.FILES["logo"]
         if request.FILES.get("cover_image"):
@@ -614,9 +612,13 @@ def clients_list(request):
 @admin_required
 def categories_list(request):
     if request.method == "POST":
-        name = request.POST.get("name", "").strip()
+        name  = request.POST.get("name", "").strip()
+        image = request.FILES.get("image")
         if name:
-            RestaurantCategory.objects.get_or_create(name=name)
+            cat, created = RestaurantCategory.objects.get_or_create(name=name)
+            if image:
+                cat.image = image
+                cat.save()
             messages.success(request, "تمت إضافة الفئة بنجاح.")
         return redirect("dashboard:categories")
 
@@ -641,11 +643,15 @@ def category_delete(request, pk):
 def category_edit(request, pk):
     category = get_object_or_404(RestaurantCategory, pk=pk)
     if request.method == "POST":
-        name = request.POST.get("name", "").strip()
+        name  = request.POST.get("name", "").strip()
+        image = request.FILES.get("image")
         if name:
             category.name = name
+        if image:
+            category.image = image
+        if name or image:
             category.save()
-            messages.success(request, f"تم تعديل الفئة إلى «{name}».")
+            messages.success(request, f"تم تعديل الفئة إلى «{category.name}».")
         else:
             messages.error(request, "اسم الفئة لا يمكن أن يكون فارغاً.")
     return redirect("dashboard:categories")
