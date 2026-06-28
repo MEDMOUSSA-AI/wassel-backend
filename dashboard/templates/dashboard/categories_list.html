@@ -7,11 +7,15 @@
 
 <div class="card">
     <h2>إضافة فئة جديدة</h2>
-    <form method="post" style="display:flex; gap:10px; align-items:flex-end;">
+    <form method="post" enctype="multipart/form-data" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
         {% csrf_token %}
-        <div class="field" style="flex:1; margin-bottom:0;">
+        <div class="field" style="flex:1; margin-bottom:0; min-width:180px;">
             <label for="name">اسم الفئة</label>
             <input type="text" id="name" name="name" placeholder="مثال: مخبزة، عصائر..." required>
+        </div>
+        <div class="field" style="flex:1; margin-bottom:0; min-width:180px;">
+            <label for="image">صورة الفئة (اختياري)</label>
+            <input type="file" id="image" name="image" accept="image/*">
         </div>
         <button type="submit" class="btn btn-primary">إضافة</button>
     </form>
@@ -22,12 +26,25 @@
     {% if categories %}
     <table>
         <thead>
-            <tr><th>الاسم</th><th>عدد المطاعم</th><th>إجراءات</th></tr>
+            <tr><th>الصورة</th><th>الاسم</th><th>عدد المطاعم</th><th>إجراءات</th></tr>
         </thead>
         <tbody>
             {% for cat in categories %}
             <tr id="cat-row-{{ cat.pk }}">
-                <!-- وضع العرض -->
+                <!-- صورة الفئة -->
+                <td>
+                    {% if cat.image %}
+                        <img src="{{ cat.image.url }}" alt="{{ cat.name }}"
+                             style="width:48px; height:48px; object-fit:cover; border-radius:8px;">
+                    {% else %}
+                        <div style="width:48px; height:48px; background:#f0f0f0; border-radius:8px;
+                                    display:flex; align-items:center; justify-content:center; color:#aaa; font-size:20px;">
+                            🍽
+                        </div>
+                    {% endif %}
+                </td>
+
+                <!-- الاسم -->
                 <td class="cat-display-name">{{ cat.name }}</td>
                 <td>{{ cat.restaurants.count }}</td>
                 <td>
@@ -47,10 +64,13 @@
                     <!-- وضع التعديل (مخفي في البداية) -->
                     <div class="cat-edit-actions" style="display:none;">
                         <form method="post" action="{% url 'dashboard:category_edit' cat.pk %}"
-                              style="display:flex; gap:6px; align-items:center;">
+                              enctype="multipart/form-data"
+                              style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                             {% csrf_token %}
                             <input type="text" name="name" id="cat-input-{{ cat.pk }}"
                                    style="padding:5px 10px; border:1px solid #ccc; border-radius:6px; font-size:14px; min-width:160px;">
+                            <input type="file" name="image" accept="image/*"
+                                   style="font-size:13px;">
                             <button type="submit" class="btn btn-primary btn-sm">حفظ</button>
                             <button type="button" class="btn btn-secondary btn-sm"
                                     onclick="cancelEditCat({{ cat.pk }}, '{{ cat.name|escapejs }}')">
@@ -72,26 +92,16 @@
 function startEditCat(pk, currentName) {
     var row = document.getElementById('cat-row-' + pk);
     var input = document.getElementById('cat-input-' + pk);
-
-    // ① أولاً: ملء الـ input بالاسم الحالي قبل أي شيء
     input.value = currentName;
-
-    // ② إخفاء أزرار العرض وإظهار أزرار التعديل
     row.querySelector('.cat-view-actions').style.display = 'none';
     row.querySelector('.cat-edit-actions').style.display = 'flex';
-
-    // ③ تركيز على الحقل وتحديد النص
     input.focus();
     input.select();
 }
 
 function cancelEditCat(pk, originalName) {
     var row = document.getElementById('cat-row-' + pk);
-
-    // إعادة القيمة الأصلية
     document.getElementById('cat-input-' + pk).value = originalName;
-
-    // العودة لوضع العرض
     row.querySelector('.cat-edit-actions').style.display = 'none';
     row.querySelector('.cat-view-actions').style.display = 'flex';
 }
