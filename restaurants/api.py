@@ -6,6 +6,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+import datetime
 
 from accounts.models import User
 from orders.models import Order
@@ -164,63 +165,163 @@ def restaurant_detail(request, pk):
     })
 
 
-# ✅ الدالة المعدلة — أضفنا القوائم والمنتجات
-@api_view(["GET"])
+# ─────────────────────────────────────────────
+# GET  /api/restaurants/mine/   — بيانات مطعم المالك
+# PATCH /api/restaurants/mine/  — تعديل المعلومات النصية
+# ─────────────────────────────────────────────
+@api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
+@parser_classes([JSONParser, MultiPartParser, FormParser])
 def my_restaurant(request):
     if request.user.role != User.Role.RESTAURANT:
         return Response({"detail": "غير مصرح."}, status=403)
     r = get_object_or_404(Restaurant, owner=request.user)
-    total_orders = Order.objects.filter(restaurant=r, status="delivered").count()
-    rating_val   = float(r.rating)
 
-    # ── القوائم والمنتجات (المالك يرى كل منتجاته بدون فلتر) ──
-    menus = []
-    for menu in r.menus.filter(is_active=True):
-        products = [
+    # ══════════════════════════════════════════
+    #  GET — إرجاع بيانات المطعم كاملة
+    # ══════════════════════════════════════════
+    if request.method == "GET":
+        total_orders = Order.objects.filter(restaurant=r, status="delivered").count()
+        rating_val   = float(r.rating)
+
+        # أوقات عمل اليوم الحالي (0=الإثنين … 6=الأحد)
+        today        = datetime.date.today().weekday()
+        today_hours  = r.working_hours.filter(day=today, is_active=True).first()
+        open_time    = str(today_hours.open_time)[:5]  if today_hours else "08:00"
+        close_time   = str(today_hours.close_time)[:5] if today_hours else "22:00"
+
+        # كل أوقات الأسبوع
+        working_hours = [
             {
-                "id":               p.id,
-                "name":             p.name,
-                "description":      p.description,
-                "price":            float(p.price),
-                "final_price":      float(p.final_price),
-                "discount_percent": p.discount_percent,
-                "display_type":     p.display_type,
-                "is_available":     p.is_available,
-                "image":            _image_url(p.image, request),
-                "rating":           float(p.rating),
+                "day":        wh.day,
+                "open_time":  str(wh.open_time)[:5],
+                "close_time": str(wh.close_time)[:5],
+                "is_active":  wh.is_active,
             }
-            for p in menu.products.all()
+            for wh in r.working_hours.all().order_by("day")
         ]
-        menus.append({
-            "id":         menu.id,
-            "name":       menu.name,
-            "time_label": menu.time_label,
-            "is_active":  menu.is_active,
-            "products":   products,
+
+        # القوائم والمنتجات
+        menus = []
+        for menu in r.menus.filter(is_active=True):
+            products = [
+                {
+                    "id":               p.id,
+                    "name":             p.name,
+                    "description":      p.description,
+                    "price":            float(p.price),
+                    "final_price":      float(p.final_price),
+                    "discount_percent": p.discount_percent,
+                    "display_type":     p.display_type,
+                    "is_available":     p.is_available,
+                    "image":            _image_url(p.image, request),
+                    "rating":           float(p.rating),
+                }
+                for p in menu.products.all()
+            ]
+            menus.append({
+                "id":         menu.id,
+                "name":       menu.name,
+                "time_label": menu.time_label,
+                "is_active":  menu.is_active,
+                "products":   products,
+            })
+
+        return Response({
+            "id":                r.id,
+            "name":              r.name,
+            "restaurant_name":   r.name,
+            "owner_name":        r.owner_name,
+            "address":           r.address,
+            "city":              r.city,
+            "lat":               r.lat,
+            "lng":               r.lng,
+            "rating":            rating_val,
+            "avg_rating":        rating_val,
+            "is_open":           r.is_open,
+            "approval_status":   r.approval_status,
+            "logo":              _image_url(r.logo, request),
+            "cover_image":       _image_url(r.cover_image, request),
+            "total_orders":      total_orders,
+            "delivery_fee":      float(r.delivery_fee),
+            "estimated_minutes": r.estimated_minutes,
+            # أوقات اليوم الحالي — تُستخدم في شاشة التعديل
+            "open_time":         open_time,
+            "close_time":        close_time,
+            # كل أوقات الأسبوع
+            "working_hours":     working_hours,
+            "menus":             menus,
         })
 
+    # ══════════════════════════════════════════
+    #  PATCH — تعديل المعلومات النصية
+    # ══════════════════════════════════════════
+    updated = []
+
+    if "name" in request.data and request.data["name"].strip():
+        r.name = request.data["name"].strip()
+        updated.append("name")
+
+    if "address" in request.data and request.data["address"].strip():
+        r.address = request.data["address"].strip()
+        updated.append("address")
+
+    if "city" in request.data and request.data["city"].strip():
+        r.city = request.data["city"].strip()
+        updated.append("city")
+
+    if "delivery_fee" in request.data:
+        try:
+            r.delivery_fee = float(request.data["delivery_fee"])
+            updated.append("delivery_fee")
+        except (TypeError, ValueError):
+            pass
+
+    if "estimated_minutes" in request.data:
+        try:
+            r.estimated_minutes = int(request.data["estimated_minutes"])
+            updated.append("estimated_minutes")
+        except (TypeError, ValueError):
+            pass
+
+    if updated:
+        r.save(update_fields=updated)
+
+    # تعديل أوقات العمل إذا أُرسلت
+    # open_time و close_time تُطبَّق على اليوم الحالي فقط
+    # لتعديل كل الأسبوع أرسل working_hours كـ list
+    open_time_str  = request.data.get("open_time")
+    close_time_str = request.data.get("close_time")
+
+    if open_time_str or close_time_str:
+        # تطبيق على كل أيام الأسبوع (0-6)
+        for day in range(7):
+            wh, _ = WorkingHours.objects.get_or_create(
+                restaurant=r,
+                day=day,
+                defaults={
+                    "open_time":  open_time_str  or "08:00",
+                    "close_time": close_time_str or "22:00",
+                    "is_active":  True,
+                },
+            )
+            if open_time_str:
+                wh.open_time = open_time_str
+            if close_time_str:
+                wh.close_time = close_time_str
+            wh.save(update_fields=[
+                f for f in ["open_time", "close_time"]
+                if (f == "open_time" and open_time_str)
+                or (f == "close_time" and close_time_str)
+            ])
+
     return Response({
-        "id":                r.id,
+        "detail":            "تم التحديث بنجاح.",
         "name":              r.name,
-        "restaurant_name":   r.name,
-        "owner_name":        r.owner_name,
         "address":           r.address,
         "city":              r.city,
-        "lat":               r.lat,
-        "lng":               r.lng,
-        "rating":            rating_val,
-        "avg_rating":        rating_val,
-        "is_open":           r.is_open,
-        "approval_status":   r.approval_status,
-        "logo":              _image_url(r.logo, request),
-        "cover_image":       _image_url(r.cover_image, request),
-        "total_orders":      total_orders,
-        "likes":             0,
-        "total_likes":       0,
         "delivery_fee":      float(r.delivery_fee),
         "estimated_minutes": r.estimated_minutes,
-        "menus":             menus,
     })
 
 
